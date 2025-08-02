@@ -40,11 +40,31 @@ router.get('/set-genre/:date', (req, res) => {
                 <label>Or enter custom genre:</label>
                 <input type="text" name="customGenre" placeholder="e.g., XMAS FILMS, 80s Movies">
               </div>
-              
+
               <div class="actions">
                 <button type="submit" class="btn btn-primary">Set Genre</button>
+                <button type="button" class="btn btn-warning" onclick="setRandomGenre()">🎲 Pick Random & Set</button>
                 <a href="/" class="btn btn-secondary">Cancel</a>
               </div>
+              
+              <script>
+              function setRandomGenre() {
+                const genreSelect = document.querySelector('select[name="genre"]');
+                const options = genreSelect.querySelectorAll('option[value!=""]'); // Exclude empty option
+                
+                if (options.length > 0) {
+                  const randomIndex = Math.floor(Math.random() * options.length);
+                  const randomGenre = options[randomIndex].value;
+                  genreSelect.value = randomGenre;
+                  
+                  // Automatically submit the form
+                  genreSelect.closest('form').submit();
+                } else {
+                  alert('No genres available to choose from!');
+                }
+              }
+              </script>
+              
             </form>
           </div>
         </div>
