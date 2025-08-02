@@ -11,6 +11,7 @@ const membersRoutes = require('./routes/members');
 const genresRoutes = require('./routes/genres');
 const weeksRoutes = require('./routes/weeks');
 const adminRoutes = require('./routes/admin');
+const filmsRoutes = require('./routes/films');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
@@ -28,6 +29,7 @@ app.use('/', membersRoutes);
 app.use('/', genresRoutes);
 app.use('/', weeksRoutes);
 app.use('/', adminRoutes);
+app.use('/', filmsRoutes);
 
 // HOME PAGE - Shows calendar and current status
 app.get('/', (req, res) => {
