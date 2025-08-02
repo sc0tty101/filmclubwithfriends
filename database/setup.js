@@ -55,32 +55,6 @@ db.serialize(() => {
     is_active INTEGER DEFAULT 1
   )`);
 
-  // Add default members if table is empty
-  db.get("SELECT COUNT(*) as count FROM members", (err, row) => {
-    if (!err && row.count === 0) {
-      const defaultMembers = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve'];
-      defaultMembers.forEach(name => {
-        db.run("INSERT INTO members (name) VALUES (?)", [name]);
-      });
-      console.log('✅ Default members added to database');
-    }
-  });
-
-  // Add default genres if table is empty
-  db.get("SELECT COUNT(*) as count FROM genres", (err, row) => {
-    if (!err && row.count === 0) {
-      const defaultGenres = [
-        'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 
-        'Romance', 'Thriller', 'Documentary', 'Animation', 'Musical'
-      ];
-      defaultGenres.forEach(name => {
-        db.run("INSERT INTO genres (name) VALUES (?)", [name]);
-      });
-      console.log('✅ Default genres added to database');
-    }
-  });
-});
-
 // Helper functions
 function getMembers(callback) {
   db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", callback);
