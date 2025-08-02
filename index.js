@@ -66,22 +66,22 @@ app.get('/', (req, res) => {
   }
 
   function getWeekActions(week) {
-    const actions = [];
-    
-    if (week.phase === 'planning') {
-      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${week.date}')">Set Genre</a>`);
-    } else if (week.phase === 'genre') {
-      actions.push(`<a href="/random-genre/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${week.date}')">Random Genre</a>`);
-    } else if (week.phase === 'nomination') {
-      actions.push(`<a href="/nominate/${week.date}" class="btn btn-success" onclick="return checkUserAndGoWithUser('/nominate/${week.date}')">Nominate Film</a>`);
-      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
-    } else if (week.phase === 'voting') {
-      actions.push(`<a href="/vote/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/vote/${week.date}')">Vote</a>`);
-      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
-    }
-    
-    return actions.join('');
+  const actions = [];
+  
+  if (week.phase === 'planning') {
+    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${week.date}')">Set Genre</a>`);
+  } else if (week.phase === 'genre') {
+    actions.push(`<a href="/random-genre/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${week.date}')">Random Genre</a>`);
+  } else if (week.phase === 'nomination') {
+    actions.push(`<a href="#" class="btn btn-success" onclick="handleNominate('${week.date}')">Nominate Film</a>`);
+    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
+  } else if (week.phase === 'voting') {
+    actions.push(`<a href="/vote/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/vote/${week.date}')">Vote</a>`);
+    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
   }
+  
+  return actions.join('');
+}
 
   const weeks = generateWeeks();
   
@@ -162,6 +162,15 @@ app.get('/', (req, res) => {
               const user = document.getElementById('currentUser').value;
               localStorage.setItem('currentUser', user);
               toggleAdminLink(user);
+            }
+
+            function handleNominate(weekDate) {
+              const user = getCurrentUser();
+              if (!user) {
+                alert('Please select your name first!');
+                return false;
+              }
+              window.location.href = '/nominate/' + weekDate + '?user=' + encodeURIComponent(user);
             }
 
             // Load current user on page load
