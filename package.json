@@ -1,15 +1,20 @@
 {
-  "name": "railway-hello-world",
+  "name": "film-club-website",
   "version": "1.0.0",
-  "description": "Simple hello world for Railway deployment",
+  "description": "A simple website for managing film club nominations and voting",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "start": "node index.js",
+    "dev": "node index.js"
   },
   "dependencies": {
-    "express": "^4.18.2"
-  }
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": ["film", "club", "voting", "nodejs", "express"],
+  "author": "Your Name",
+  "license": "MIT"
 }
