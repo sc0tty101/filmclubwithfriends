@@ -379,6 +379,135 @@ body {
   line-height: 1.4;
 }
 
+/* Results Page Styles - ADD THESE TO YOUR EXISTING styles.css */
+
+/* Winner Display */
+.winner-display {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  border-radius: 12px;
+  border: 3px solid #f39c12;
+}
+
+.winner-poster {
+  width: 120px;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.winner-details h3 {
+  margin: 0 0 10px 0;
+  color: #8b4513;
+  font-size: 24px;
+}
+
+.winner-details p {
+  margin: 5px 0;
+  color: #8b4513;
+  font-weight: bold;
+}
+
+/* Results List */
+.results-list {
+  margin-top: 20px;
+}
+
+.result-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+  background: white;
+}
+
+.result-item.winner {
+  border-color: #ffd700;
+  background: linear-gradient(135deg, #fff9e6, #fffbf0);
+}
+
+.result-item:last-child {
+  margin-bottom: 0;
+}
+
+/* Result Rank */
+.result-rank {
+  background: #666;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.result-item.winner .result-rank {
+  background: #ffd700;
+  color: #8b4513;
+  font-size: 20px;
+  width: 45px;
+  height: 45px;
+}
+
+/* Result Score */
+.result-score {
+  margin-left: auto;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.score {
+  background: #2196f3;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.result-item.winner .score {
+  background: #f39c12;
+  color: white;
+  font-size: 18px;
+  padding: 10px 15px;
+}
+
+/* Mobile Responsive for Results */
+@media (max-width: 768px) {
+  .winner-display {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .winner-poster {
+    width: 100px;
+    height: 150px;
+  }
+  
+  .result-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+  
+  .result-score {
+    margin-left: 0;
+  }
+}
+
+
 /* Selected Film Display */
 .selected-film {
   margin: 20px 0;
