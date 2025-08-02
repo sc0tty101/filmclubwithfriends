@@ -13,6 +13,7 @@ const weeksRoutes = require('./routes/weeks');
 const adminRoutes = require('./routes/admin');
 const filmsRoutes = require('./routes/films');
 const votesRoutes = require('./routes/votes');
+const resultsRoutes = require('./routes/results');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
@@ -32,6 +33,7 @@ app.use('/', weeksRoutes);
 app.use('/', adminRoutes);
 app.use('/', filmsRoutes);
 app.use('/', votesRoutes);
+app.use('/', resultsRoutes);
 
 // HOME PAGE - Shows calendar and current status with voting status
 app.get('/', (req, res) => {
@@ -65,40 +67,6 @@ app.get('/', (req, res) => {
       });
     }
     return weeks;
-  }
-
-  function getWeekActions(week, userVotes, userNominations) {
-    const actions = [];
-    
-    if (week.phase === 'planning') {
-      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${week.date}')">Set Genre</a>`);
-    } else if (week.phase === 'genre') {
-      actions.push(`<a href="/random-genre/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${week.date}')">Random Genre</a>`);
-    } else if (week.phase === 'nomination') {
-      // Check if user has nominated for this week
-      const userNominated = userNominations.some(nom => nom.week_id === week.id);
-      
-      if (userNominated) {
-        actions.push(`<a href="/nominate/${week.date}" class="btn btn-success btn-outline" onclick="checkUserAndGoWithUser('/nominate/${week.date}'); return false;">✓ Edit Nomination</a>`);
-      } else {
-        actions.push(`<a href="/nominate/${week.date}" class="btn btn-success" onclick="checkUserAndGoWithUser('/nominate/${week.date}'); return false;">Nominate Film</a>`);
-      }
-      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
-    } else if (week.phase === 'voting') {
-      // Check if user has voted for this week
-      const userVoted = userVotes.some(vote => vote.week_id === week.id);
-      
-      if (userVoted) {
-        actions.push(`<a href="/vote/${week.date}" class="btn btn-warning btn-outline" onclick="checkUserAndGoWithUser('/vote/${week.date}'); return false;">✓ View Your Vote</a>`);
-      } else {
-        actions.push(`<a href="/vote/${week.date}" class="btn btn-warning" onclick="checkUserAndGoWithUser('/vote/${week.date}'); return false;">Vote</a>`);
-      }
-      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
-    } else if (week.phase === 'complete') {
-      actions.push(`<a href="/results/${week.date}" class="btn btn-success">View Results</a>`);
-    }
-    
-    return actions.join('');
   }
 
   const weeks = generateWeeks();
