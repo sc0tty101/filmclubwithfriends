@@ -62,6 +62,11 @@ router.get('/nominate/:date', (req, res) => {
                             <p><strong>Nominated by:</strong> ${nom.user_name}</p>
                           </div>
                         </div>
+                        ${nom.user_name === currentUser ? `
+                          <div class="nomination-actions">
+                            <button class="btn btn-secondary" onclick="editNomination(${nom.id}, '${nom.film_title}', '${nom.film_year}')">Edit</button>
+                          </div>
+                        ` : ''}
                       </div>
                     `).join('')
                   }
@@ -217,6 +222,25 @@ router.get('/nominate/:date', (req, res) => {
               errorDiv.style.display = 'block';
             }
             
+            function editNomination(nominationId, currentTitle, currentYear) {
+              if (confirm(\`Replace "\${currentTitle} (\${currentYear})" with a new film?\`)) {
+                // Delete the current nomination
+                fetch('/delete-nomination/' + nominationId, { method: 'POST' })
+                  .then(response => response.json())
+                  .then(data => {
+                    if (data.success) {
+                      // Refresh the page to show updated nominations and allow new nomination
+                      window.location.reload();
+                    } else {
+                      alert('Failed to remove current nomination');
+                    }
+                  })
+                  .catch(error => {
+                    alert('Error removing nomination');
+                  });
+              }
+            }
+            
             function moveToVoting() {
               if (confirm('Move this week to voting phase? Members will no longer be able to nominate films.')) {
                 fetch('/move-to-voting/${weekDate}', { method: 'POST' })
@@ -293,6 +317,28 @@ router.post('/move-to-voting/:date', (req, res) => {
         console.error(err);
         return res.status(500).send('Database error');
       }
+      res.json({ success: true });
+    }
+  );
+});
+
+// DELETE NOMINATION
+router.post('/delete-nomination/:id', (req, res) => {
+  const nominationId = req.params.id;
+  
+  req.db.run(
+    "DELETE FROM nominations WHERE id = ?",
+    [nominationId],
+    function(err) {
+      if (err) {
+        console.error(err);
+        return res.json({ success: false, error: 'Database error' });
+      }
+      
+      if (this.changes === 0) {
+        return res.json({ success: false, error: 'Nomination not found' });
+      }
+      
       res.json({ success: true });
     }
   );
