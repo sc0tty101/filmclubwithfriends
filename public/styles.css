@@ -309,8 +309,6 @@ body {
   color: #721c24; 
 }
 
-/* Film Nomination Styles - ADD THESE TO YOUR EXISTING styles.css */
-
 /* Search Results */
 .search-results {
   margin-top: 10px;
@@ -457,6 +455,21 @@ body {
   margin: 0;
   color: #666;
   font-size: 14px;
+}
+
+/* Nomination Actions */
+.nomination-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.nomination-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #eee;
 }
 
 /* Responsive Design for Film Components */
