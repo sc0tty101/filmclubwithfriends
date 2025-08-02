@@ -1,12 +1,10 @@
 const express = require('express');
 const router = express.Router();
 
-// TMDB API key (you already have this in your main app)
-const TMDB_API_KEY = process.env.TMDB_API_KEY || 'fallback_key_for_local_dev';
-
 // NOMINATION PAGE
 router.get('/nominate/:date', (req, res) => {
   const weekDate = req.params.date;
+  const currentUser = req.query.user || 'Unknown'; // Get user from URL parameter
   
   // Get week info and existing nominations
   req.db.get("SELECT * FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
@@ -29,6 +27,10 @@ router.get('/nominate/:date', (req, res) => {
           return res.status(500).send('Database error');
         }
 
+        // Check if current user already nominated
+        const userNomination = nominations.find(nom => nom.user_name === currentUser);
+        const canNominate = currentUser !== 'Unknown' && !userNomination;
+
         res.send(`
           <!DOCTYPE html>
           <html>
@@ -43,6 +45,7 @@ router.get('/nominate/:date', (req, res) => {
                 <h1>🎬 Nominate a Film</h1>
                 <p><strong>Week:</strong> ${new Date(weekDate).toLocaleDateString()}</p>
                 <p><strong>Genre:</strong> ${week.genre}</p>
+                <p><strong>Current User:</strong> ${currentUser}</p>
               </div>
 
               <div class="card">
@@ -65,28 +68,38 @@ router.get('/nominate/:date', (req, res) => {
                 </div>
               </div>
 
-              <div class="card">
-                <h2>Add Your Nomination</h2>
-                <div class="form-group">
-                  <label>Search for a film:</label>
-                  <input type="text" id="filmSearch" placeholder="Start typing a film title..." onkeyup="searchFilms()">
-                  <div id="searchResults" class="search-results"></div>
-                </div>
-
-                <form id="nominationForm" action="/nominate/${weekDate}" method="POST" style="display: none;">
-                  <input type="hidden" id="selectedFilmId" name="tmdbId">
-                  <input type="hidden" id="selectedFilmTitle" name="filmTitle">
-                  <input type="hidden" id="selectedFilmYear" name="filmYear">
-                  <input type="hidden" id="selectedPosterUrl" name="posterUrl">
+              ${canNominate ? `
+                <div class="card">
+                  <h2>Add Your Nomination</h2>
+                  <div id="errorMessage" class="alert alert-error" style="display: none;"></div>
                   
-                  <div class="selected-film" id="selectedFilm"></div>
-                  
-                  <div class="actions">
-                    <button type="submit" class="btn btn-primary">Nominate This Film</button>
-                    <button type="button" class="btn btn-secondary" onclick="clearSelection()">Clear Selection</button>
+                  <div class="form-group">
+                    <label>Search for a film:</label>
+                    <input type="text" id="filmSearch" placeholder="Start typing a film title..." onkeyup="searchFilms()">
+                    <div id="searchResults" class="search-results"></div>
                   </div>
-                </form>
-              </div>
+
+                  <form id="nominationForm" style="display: none;">
+                    <input type="hidden" id="selectedFilmId" name="tmdbId">
+                    <input type="hidden" id="selectedFilmTitle" name="filmTitle">
+                    <input type="hidden" id="selectedFilmYear" name="filmYear">
+                    <input type="hidden" id="selectedPosterUrl" name="posterUrl">
+                    
+                    <div class="selected-film" id="selectedFilm"></div>
+                    
+                    <div class="actions">
+                      <button type="button" class="btn btn-primary" onclick="submitNomination()">Nominate This Film</button>
+                      <button type="button" class="btn btn-secondary" onclick="clearSelection()">Clear Selection</button>
+                    </div>
+                  </form>
+                </div>
+              ` : `
+                <div class="card">
+                  <div class="alert alert-error">
+                    ${currentUser === 'Unknown' ? 'Please select your name on the main page first.' : `You (${currentUser}) have already nominated a film for this week.`}
+                  </div>
+                </div>
+              `}
 
               <div class="actions center">
                 <a href="/" class="btn btn-secondary">Back to Calendar</a>
@@ -108,7 +121,7 @@ router.get('/nominate/:date', (req, res) => {
               // Debounce search
               clearTimeout(searchTimeout);
               searchTimeout = setTimeout(() => {
-                fetch(\`https://api.themoviedb.org/3/search/movie?api_key=${TMDB_API_KEY}&query=\${encodeURIComponent(query)}\`)
+                fetch(\`https://api.themoviedb.org/3/search/movie?api_key=${process.env.TMDB_API_KEY}&query=\${encodeURIComponent(query)}\`)
                   .then(response => response.json())
                   .then(data => {
                     displaySearchResults(data.results || []);
@@ -166,6 +179,42 @@ router.get('/nominate/:date', (req, res) => {
               document.getElementById('nominationForm').style.display = 'none';
               document.getElementById('filmSearch').value = '';
               document.getElementById('searchResults').innerHTML = '';
+              document.getElementById('errorMessage').style.display = 'none';
+            }
+            
+            function submitNomination() {
+              const formData = {
+                tmdbId: document.getElementById('selectedFilmId').value,
+                filmTitle: document.getElementById('selectedFilmTitle').value,
+                filmYear: document.getElementById('selectedFilmYear').value,
+                posterUrl: document.getElementById('selectedPosterUrl').value,
+                userName: '${currentUser}'
+              };
+              
+              fetch('/nominate/${weekDate}', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+              })
+              .then(response => response.json())
+              .then(data => {
+                if (data.success) {
+                  window.location.reload(); // Refresh to show new nomination
+                } else {
+                  showError(data.error || 'Failed to nominate film');
+                }
+              })
+              .catch(error => {
+                showError('Network error. Please try again.');
+              });
+            }
+            
+            function showError(message) {
+              const errorDiv = document.getElementById('errorMessage');
+              errorDiv.textContent = message;
+              errorDiv.style.display = 'block';
             }
             
             function moveToVoting() {
@@ -187,18 +236,17 @@ router.get('/nominate/:date', (req, res) => {
 // HANDLE FILM NOMINATION
 router.post('/nominate/:date', (req, res) => {
   const weekDate = req.params.date;
-  const { tmdbId, filmTitle, filmYear, posterUrl } = req.body;
-  const userName = 'CurrentUser'; // We'll improve this with user session later
+  const { tmdbId, filmTitle, filmYear, posterUrl, userName } = req.body;
   
-  if (!tmdbId || !filmTitle) {
-    return res.status(400).send('Film information is required');
+  if (!tmdbId || !filmTitle || !userName || userName === 'Unknown') {
+    return res.json({ success: false, error: 'Film information and user name are required' });
   }
   
   // Get week ID
   req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
     if (err || !week) {
       console.error(err);
-      return res.status(500).send('Week not found');
+      return res.json({ success: false, error: 'Week not found' });
     }
     
     // Check if user already nominated for this week
@@ -208,11 +256,11 @@ router.post('/nominate/:date', (req, res) => {
       (err, existing) => {
         if (err) {
           console.error(err);
-          return res.status(500).send('Database error');
+          return res.json({ success: false, error: 'Database error' });
         }
         
         if (existing) {
-          return res.status(400).send('You have already nominated a film for this week');
+          return res.json({ success: false, error: 'You have already nominated a film for this week' });
         }
         
         // Insert nomination
@@ -222,10 +270,10 @@ router.post('/nominate/:date', (req, res) => {
           function(err) {
             if (err) {
               console.error(err);
-              return res.status(500).send('Failed to save nomination');
+              return res.json({ success: false, error: 'Failed to save nomination' });
             }
             
-            res.redirect(`/nominate/${weekDate}?message=Film nominated successfully`);
+            res.json({ success: true });
           }
         );
       }
