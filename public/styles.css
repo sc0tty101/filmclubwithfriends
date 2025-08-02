@@ -654,6 +654,284 @@ body {
   50% { opacity: 0.8; }
 }
 
+/* Enhanced Results Page Styles - ADD THESE TO YOUR EXISTING styles.css */
+
+/* Stats Summary */
+.stats-summary {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  background: #f0f0f0;
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Winner Card Enhancement */
+.winner-card {
+  border: 3px solid #ffd700;
+  background: linear-gradient(135deg, #fff9e6, #fffbf0);
+}
+
+.winner-display {
+  display: flex;
+  gap: 25px;
+  align-items: flex-start;
+  padding: 25px;
+  background: linear-gradient(135deg, #ffd700, #ffed4e);
+  border-radius: 12px;
+  border: 3px solid #f39c12;
+}
+
+.winner-poster {
+  width: 140px;
+  height: 210px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+}
+
+.winner-details h3 {
+  margin: 0 0 15px 0;
+  color: #8b4513;
+  font-size: 28px;
+}
+
+.winner-details p {
+  margin: 8px 0;
+  color: #8b4513;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* Winner Stats */
+.winner-stats {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.stat-badge {
+  background: rgba(139, 69, 19, 0.1);
+  border: 2px solid #8b4513;
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  min-width: 70px;
+}
+
+.stat-number {
+  display: block;
+  font-size: 20px;
+  font-weight: bold;
+  color: #8b4513;
+}
+
+.stat-label {
+  display: block;
+  font-size: 12px;
+  color: #8b4513;
+  margin-top: 2px;
+}
+
+/* Enhanced Results List */
+.result-item {
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  background: white;
+  overflow: hidden;
+}
+
+.result-item.winner {
+  border-color: #ffd700;
+  background: linear-gradient(135deg, #fff9e6, #fffbf0);
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+}
+
+.result-rank {
+  background: #666;
+  color: white;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.result-item.winner .result-rank {
+  background: #ffd700;
+  color: #8b4513;
+  font-size: 22px;
+  width: 55px;
+  height: 55px;
+}
+
+.result-score {
+  margin-left: auto;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.total-score {
+  background: #2196f3;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 25px;
+  font-weight: bold;
+  font-size: 18px;
+  display: inline-block;
+  margin-bottom: 5px;
+}
+
+.result-item.winner .total-score {
+  background: #f39c12;
+  font-size: 20px;
+  padding: 12px 18px;
+}
+
+.avg-score {
+  font-size: 12px;
+  color: #666;
+}
+
+/* Vote Breakdown */
+.vote-breakdown {
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+  padding: 15px 20px;
+}
+
+.vote-breakdown h5 {
+  margin: 0 0 10px 0;
+  color: #333;
+  font-size: 14px;
+}
+
+.votes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.vote-detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.voter-name {
+  font-weight: bold;
+  color: #333;
+}
+
+.vote-info {
+  font-size: 13px;
+  color: #666;
+}
+
+.no-votes {
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  margin: 0;
+}
+
+/* Voting Summary */
+.voting-summary {
+  background: #f0f4f8;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.summary-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.summary-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border-left: 4px solid #2196f3;
+}
+
+.highlight {
+  color: #2196f3;
+  font-weight: bold;
+}
+
+/* Mobile Responsive for Enhanced Results */
+@media (max-width: 768px) {
+  .stats-summary {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .winner-display {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .winner-stats {
+    justify-content: center;
+  }
+  
+  .result-header {
+    flex-direction: column;
+    text-align: center;
+    gap: 15px;
+  }
+  
+  .result-score {
+    margin-left: 0;
+  }
+  
+  .votes-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .vote-detail {
+    flex-direction: column;
+    gap: 5px;
+    text-align: center;
+  }
+  
+  .summary-stat {
+    flex-direction: column;
+    gap: 5px;
+    text-align: center;
+  }
+}
+
+
 /* Responsive Design for Film Components */
 @media (max-width: 768px) {
   .result-info {
