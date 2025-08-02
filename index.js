@@ -33,7 +33,7 @@ app.use('/', adminRoutes);
 app.use('/', filmsRoutes);
 app.use('/', votesRoutes);
 
-// HOME PAGE - Shows calendar and current status
+// HOME PAGE - Shows calendar and current status with voting status
 app.get('/', (req, res) => {
   // Helper functions
   function getMondayOfWeek(date) {
@@ -67,25 +67,39 @@ app.get('/', (req, res) => {
     return weeks;
   }
 
-function getWeekActions(week) {
-  const actions = [];
-  
-  if (week.phase === 'planning') {
-    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${week.date}')">Set Genre</a>`);
-  } else if (week.phase === 'genre') {
-    actions.push(`<a href="/random-genre/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${week.date}')">Random Genre</a>`);
-  } else if (week.phase === 'nomination') {
-    actions.push(`<a href="/nominate/${week.date}" class="btn btn-success" onclick="checkUserAndGoWithUser('/nominate/${week.date}'); return false;">Nominate Film</a>`);
-    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
-  } else if (week.phase === 'voting') {
-    actions.push(`<a href="/vote/${week.date}" class="btn btn-warning" onclick="checkUserAndGoWithUser('/vote/${week.date}'); return false;">Vote</a>`);
-    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
-  } else if (week.phase === 'complete') {
-    actions.push(`<a href="/results/${week.date}" class="btn btn-success">View Results</a>`);
+  function getWeekActions(week, userVotes, userNominations) {
+    const actions = [];
+    
+    if (week.phase === 'planning') {
+      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${week.date}')">Set Genre</a>`);
+    } else if (week.phase === 'genre') {
+      actions.push(`<a href="/random-genre/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${week.date}')">Random Genre</a>`);
+    } else if (week.phase === 'nomination') {
+      // Check if user has nominated for this week
+      const userNominated = userNominations.some(nom => nom.week_id === week.id);
+      
+      if (userNominated) {
+        actions.push(`<a href="/nominate/${week.date}" class="btn btn-success btn-outline" onclick="checkUserAndGoWithUser('/nominate/${week.date}'); return false;">✓ Edit Nomination</a>`);
+      } else {
+        actions.push(`<a href="/nominate/${week.date}" class="btn btn-success" onclick="checkUserAndGoWithUser('/nominate/${week.date}'); return false;">Nominate Film</a>`);
+      }
+      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
+    } else if (week.phase === 'voting') {
+      // Check if user has voted for this week
+      const userVoted = userVotes.some(vote => vote.week_id === week.id);
+      
+      if (userVoted) {
+        actions.push(`<a href="/vote/${week.date}" class="btn btn-warning btn-outline" onclick="checkUserAndGoWithUser('/vote/${week.date}'); return false;">✓ View Your Vote</a>`);
+      } else {
+        actions.push(`<a href="/vote/${week.date}" class="btn btn-warning" onclick="checkUserAndGoWithUser('/vote/${week.date}'); return false;">Vote</a>`);
+      }
+      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
+    } else if (week.phase === 'complete') {
+      actions.push(`<a href="/results/${week.date}" class="btn btn-success">View Results</a>`);
+    }
+    
+    return actions.join('');
   }
-  
-  return actions.join('');
-}
 
   const weeks = generateWeeks();
   
@@ -103,69 +117,90 @@ function getWeekActions(week) {
         return res.status(500).send('Database error');
       }
 
-      // Merge generated weeks with database data
-      const weeksData = weeks.map(week => {
-        const dbWeek = dbWeeks.find(w => w.week_date === week.date);
-        return {
-          ...week,
-          id: dbWeek?.id,
-          genre: dbWeek?.genre,
-          phase: dbWeek?.phase || 'planning',
-          created_by: dbWeek?.created_by
-        };
-      });
+      // Get user voting and nomination status for all weeks
+      db.all(`
+        SELECT v.week_id, v.user_name, 'vote' as type
+        FROM votes v
+        UNION ALL
+        SELECT n.week_id, n.user_name, 'nomination' as type  
+        FROM nominations n
+      `, (err, userActivity) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).send('Database error');
+        }
 
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Film Club</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <link rel="stylesheet" href="/styles.css">
-        </head>
-        <body>
-          <div class="user-select">
-            <label>You are: </label>
-            <select id="currentUser" onchange="setCurrentUser()">
-              <option value="">Select your name</option>
-              ${members.map(member => `<option value="${member.name}">${member.name}</option>`).join('')}
-            </select>
-          </div>
+        // Merge generated weeks with database data
+        const weeksData = weeks.map(week => {
+          const dbWeek = dbWeeks.find(w => w.week_date === week.date);
+          return {
+            ...week,
+            id: dbWeek?.id,
+            genre: dbWeek?.genre,
+            phase: dbWeek?.phase || 'planning',
+            created_by: dbWeek?.created_by
+          };
+        });
 
-          <div class="container">
-            <div class="header">
-              <h1>🎬 Film Club Calendar</h1>
-              <p>Manage your weekly film selections and voting</p>
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Film Club</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link rel="stylesheet" href="/styles.css">
+          </head>
+          <body>
+            <div class="user-select">
+              <label>You are: </label>
+              <select id="currentUser" onchange="setCurrentUser()">
+                <option value="">Select your name</option>
+                ${members.map(member => `<option value="${member.name}">${member.name}</option>`).join('')}
+              </select>
             </div>
 
-            <div class="nav-buttons">
-              <a href="/manage-users">👥 Manage Members</a>
-              <a href="/manage-genres">🎭 Manage Genres</a>
-              <a href="/statistics">📊 Statistics</a>
-              <a href="/admin/import-genres" id="adminLink" style="display: none;">🔧 Admin</a>
-            </div>
-
-            ${weeksData.map(week => `
-              <div class="week-card">
-                <div class="week-info">
-                  <h3>${week.displayDate}</h3>
-                  <p><strong>Genre:</strong> ${week.genre || 'Not set'}</p>
-                  ${week.created_by ? `<p><strong>Set by:</strong> ${week.created_by}</p>` : ''}
-                </div>
-                <div class="actions">
-                  <span class="phase-badge phase-${week.phase}">${week.phase}</span>
-                  ${getWeekActions(week)}
-                </div>
+            <div class="container">
+              <div class="header">
+                <h1>🎬 Film Club Calendar</h1>
+                <p>Manage your weekly film selections and voting</p>
               </div>
-            `).join('')}
-          </div>
 
-          <script>
+              <div class="nav-buttons">
+                <a href="/manage-users">👥 Manage Members</a>
+                <a href="/manage-genres">🎭 Manage Genres</a>
+                <a href="/statistics">📊 Statistics</a>
+                <a href="/admin/import-genres" id="adminLink" style="display: none;">🔧 Admin</a>
+              </div>
+
+              <div id="weeksList">
+                ${weeksData.map(week => `
+                  <div class="week-card">
+                    <div class="week-info">
+                      <h3>${week.displayDate}</h3>
+                      <p><strong>Genre:</strong> ${week.genre || 'Not set'}</p>
+                      ${week.created_by ? `<p><strong>Set by:</strong> ${week.created_by}</p>` : ''}
+                    </div>
+                    <div class="actions">
+                      <span class="phase-badge phase-${week.phase}">${week.phase}</span>
+                      <div class="week-actions" data-week-id="${week.id}" data-week-date="${week.date}" data-week-phase="${week.phase}">
+                        <!-- Actions will be populated by JavaScript based on selected user -->
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+
+            <script>
+            // Store user activity data
+            const userActivity = ${JSON.stringify(userActivity)};
+            
             // Save current user in browser storage
             function setCurrentUser() {
               const user = document.getElementById('currentUser').value;
               localStorage.setItem('currentUser', user);
               toggleAdminLink(user);
+              updateWeekActions(user);
             }
 
             function handleNominate(weekDate) {
@@ -183,6 +218,7 @@ function getWeekActions(week) {
               if (savedUser) {
                 document.getElementById('currentUser').value = savedUser;
                 toggleAdminLink(savedUser);
+                updateWeekActions(savedUser);
               }
             }
 
@@ -242,10 +278,63 @@ function getWeekActions(week) {
                 adminButtons.forEach(btn => btn.style.display = 'none');
               }
             }
-          </script>
-        </body>
-        </html>
-      `);
+            
+            function updateWeekActions(user) {
+              if (!user) return;
+              
+              // Get user's votes and nominations
+              const userVotes = userActivity.filter(activity => 
+                activity.user_name === user && activity.type === 'vote'
+              );
+              const userNominations = userActivity.filter(activity => 
+                activity.user_name === user && activity.type === 'nomination'
+              );
+              
+              // Update each week's actions
+              document.querySelectorAll('.week-actions').forEach(actionsDiv => {
+                const weekId = parseInt(actionsDiv.dataset.weekId);
+                const weekDate = actionsDiv.dataset.weekDate;
+                const weekPhase = actionsDiv.dataset.weekPhase;
+                
+                let actions = '';
+                
+                if (weekPhase === 'planning') {
+                  actions += \`<a href="/set-genre/\${weekDate}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/\${weekDate}')">Set Genre</a>\`;
+                } else if (weekPhase === 'genre') {
+                  actions += \`<a href="/random-genre/\${weekDate}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/\${weekDate}')">Random Genre</a>\`;
+                } else if (weekPhase === 'nomination') {
+                  const userNominated = userNominations.some(nom => nom.week_id === weekId);
+                  
+                  if (userNominated) {
+                    actions += \`<a href="/nominate/\${weekDate}" class="btn btn-success btn-outline" onclick="checkUserAndGoWithUser('/nominate/\${weekDate}'); return false;">✓ Edit Nomination</a>\`;
+                  } else {
+                    actions += \`<a href="/nominate/\${weekDate}" class="btn btn-success" onclick="checkUserAndGoWithUser('/nominate/\${weekDate}'); return false;">Nominate Film</a>\`;
+                  }
+                  actions += \`<a href="/set-genre/\${weekDate}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/\${weekDate}')">Change Genre</a>\`;
+                } else if (weekPhase === 'voting') {
+                  const userVoted = userVotes.some(vote => vote.week_id === weekId);
+                  
+                  if (userVoted) {
+                    actions += \`<a href="/vote/\${weekDate}" class="btn btn-warning btn-outline" onclick="checkUserAndGoWithUser('/vote/\${weekDate}'); return false;">✓ View Your Vote</a>\`;
+                  } else {
+                    actions += \`<a href="/vote/\${weekDate}" class="btn btn-warning" onclick="checkUserAndGoWithUser('/vote/\${weekDate}'); return false;">Vote</a>\`;
+                  }
+                  actions += \`<a href="/set-genre/\${weekDate}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/\${weekDate}')">Change Genre</a>\`;
+                } else if (weekPhase === 'complete') {
+                  actions += \`<a href="/results/\${weekDate}" class="btn btn-success">View Results</a>\`;
+                }
+                
+                actionsDiv.innerHTML = actions;
+              });
+              
+              // Re-apply admin visibility
+              toggleAdminLink(user);
+            }
+            </script>
+          </body>
+          </html>
+        `);
+      });
     });
   });
 });
