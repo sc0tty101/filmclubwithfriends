@@ -40,29 +40,97 @@ router.get('/set-genre/:date', (req, res) => {
                 <label>Or enter custom genre:</label>
                 <input type="text" name="customGenre" placeholder="e.g., XMAS FILMS, 80s Movies">
               </div>
-
+              
               <div class="actions">
                 <button type="submit" class="btn btn-primary">Set Genre</button>
                 <button type="button" class="btn btn-warning" onclick="setRandomGenre()">🎲 Pick Random & Set</button>
                 <a href="/" class="btn btn-secondary">Cancel</a>
               </div>
-              
-              <script>
-              function setRandomGenre() {
-                const genreSelect = document.querySelector('select[name="genre"]');
-                const options = genreSelect.querySelectorAll('option[value!=""]'); // Exclude empty option
-                
-                if (options.length > 0) {
-                  const randomIndex = Math.floor(Math.random() * options.length);
-                  const randomGenre = options[randomIndex].value;
-                  genreSelect.value = randomGenre;
-                  
-                  // Automatically submit the form
-                  genreSelect.closest('form').submit();
-                } else {
-                  alert('No genres available to choose from!');
-                }
-              }
+            </form>
+          </div>
+        </div>
+
+        <script>
+        function setRandomGenre() {
+          const genreSelect = document.querySelector('select[name="genre"]');
+          const options = Array.from(genreSelect.options).filter(option => option.value !== "");
+          
+          if (options.length > 0) {
+            const randomIndex = Math.floor(Math.random() * options.length);
+            const randomOption = options[randomIndex];
+            genreSelect.value = randomOption.value;
+            
+            // Submit the form
+            document.querySelector('form').submit();
+          } else {
+            alert('No genres available to choose from!');
+          }
+        }
+        </script>
+      </body>
+      </html>
+    `);
+  });
+});
+
+// HANDLE GENRE SETTING
+router.post('/set-genre/:date', (req, res) => {
+  const weekDate = req.params.date;
+  const genre = req.body.customGenre || req.body.genre;
+  const currentUser = 'Unknown'; // We'll improve this later
+  
+  if (!genre) {
+    return res.status(400).send('Genre is required');
+  }
+
+  // Insert or update week in database
+  req.db.run(
+    `INSERT OR REPLACE INTO weeks (week_date, genre, genre_source, phase, created_by) 
+     VALUES (?, ?, 'user', 'nomination', ?)`,
+    [weekDate, genre, currentUser],
+    function(err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).send('Database error');
+      }
+      res.redirect('/');
+    }
+  );
+});
+
+// RANDOM GENRE ENDPOINT
+router.get('/random-genre/:date', (req, res) => {
+  const weekDate = req.params.date;
+  
+  // Get genres from database and pick random one
+  getGenres((err, genres) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Database error');
+    }
+
+    if (genres.length === 0) {
+      return res.status(400).send('No genres available. Please add some genres first.');
+    }
+
+    const randomGenre = genres[Math.floor(Math.random() * genres.length)].name;
+    
+    req.db.run(
+      `UPDATE weeks SET genre = ?, genre_source = 'random', phase = 'nomination' 
+       WHERE week_date = ?`,
+      [randomGenre, weekDate],
+      function(err) {
+        if (err) {
+          console.error(err);
+          return res.status(500).send('Database error');
+        }
+        res.redirect('/');
+      }
+    );
+  });
+});
+
+module.exports = router;              }
               </script>
               
             </form>
