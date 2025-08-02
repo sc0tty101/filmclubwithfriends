@@ -134,6 +134,7 @@ app.get('/', (req, res) => {
               <a href="/manage-users">👥 Manage Members</a>
               <a href="/manage-genres">🎭 Manage Genres</a>
               <a href="/statistics">📊 Statistics</a>
+              <a href="/admin/import-genres" id="adminLink" style="display: none;">🔧 Admin</a>
             </div>
 
             ${weeksData.map(week => `
@@ -152,10 +153,20 @@ app.get('/', (req, res) => {
           </div>
 
           <script>
-            // Save current user in browser storage
+            // Save current user in browser storage            
             function setCurrentUser() {
               const user = document.getElementById('currentUser').value;
               localStorage.setItem('currentUser', user);
+              toggleAdminLink(user);
+            }
+            
+            function toggleAdminLink(user) {
+              const adminLink = document.getElementById('adminLink');
+              if (user === 'Bels' || user === 'Scott') {
+                adminLink.style.display = 'inline-block';
+              } else {
+                adminLink.style.display = 'none';
+              }
             }
 
             // Load current user on page load
@@ -163,6 +174,7 @@ app.get('/', (req, res) => {
               const savedUser = localStorage.getItem('currentUser');
               if (savedUser) {
                 document.getElementById('currentUser').value = savedUser;
+                toggleAdminLink(savedUser);
               }
             }
 
