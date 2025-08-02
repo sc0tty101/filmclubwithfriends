@@ -95,7 +95,6 @@ router.get('/manage-users', (req, res) => {
     `);
   });
 });
-
 // ADD MEMBER
 router.post('/add-member', (req, res) => {
   const memberName = req.body.memberName?.trim();
@@ -109,15 +108,32 @@ router.post('/add-member', (req, res) => {
     return res.redirect('/manage-users?message=Member name too long (max 50 characters)&type=error');
   }
 
+  // First, try to reactivate existing member
   req.db.run(
-    "INSERT INTO members (name, is_admin, is_active) VALUES (?, ?, 1) ON CONFLICT(name) DO UPDATE SET is_active = 1, is_admin = ?",
-    [memberName, isAdmin, isAdmin],
+    "UPDATE members SET is_active = 1, is_admin = ? WHERE name = ?",
+    [isAdmin, memberName],
     function(err) {
       if (err) {
         console.error(err);
         return res.redirect('/manage-users?message=Failed to add member&type=error');
       }
-      res.redirect('/manage-users?message=Member added successfully');
+      
+      // If no rows were updated (member doesn't exist), insert new member
+      if (this.changes === 0) {
+        req.db.run(
+          "INSERT INTO members (name, is_admin, is_active) VALUES (?, ?, 1)",
+          [memberName, isAdmin],
+          function(err) {
+            if (err) {
+              console.error(err);
+              return res.redirect('/manage-users?message=Failed to add member&type=error');
+            }
+            res.redirect('/manage-users?message=Member added successfully');
+          }
+        );
+      } else {
+        res.redirect('/manage-users?message=Member reactivated successfully');
+      }
     }
   );
 });
