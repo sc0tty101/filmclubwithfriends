@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 // TMDB API key (you already have this in your main app)
-const TMDB_API_KEY = 'ac0757cdc5f572f37ea1a48e787f9e99';
+const TMDB_API_KEY = process.env.TMDB_API_KEY || 'fallback_key_for_local_dev';
 
 // NOMINATION PAGE
 router.get('/nominate/:date', (req, res) => {
