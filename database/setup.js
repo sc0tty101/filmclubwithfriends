@@ -36,3 +36,36 @@ db.serialize(() => {
     user_name TEXT,
     votes_json TEXT,
     voted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (week_id) REFERENCES weeks(id)
+  )`);
+
+  // Members table - stores club members
+  db.run(`CREATE TABLE IF NOT EXISTS members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_active INTEGER DEFAULT 1
+  )`);
+
+  // Genres table - stores available genres
+  db.run(`CREATE TABLE IF NOT EXISTS genres (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    is_active INTEGER DEFAULT 1
+  )`);
+}); // ← This closing bracket was missing!
+
+// Helper functions (these need to be OUTSIDE the serialize block)
+function getMembers(callback) {
+  db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", callback);
+}
+
+function getGenres(callback) {
+  db.all("SELECT name FROM genres WHERE is_active = 1 ORDER BY name", callback);
+}
+
+// Export database instance and helper functions
+module.exports = db;
+module.exports.getMembers = getMembers;
+module.exports.getGenres = getGenres;
