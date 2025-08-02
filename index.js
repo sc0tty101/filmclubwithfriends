@@ -73,7 +73,7 @@ app.get('/', (req, res) => {
     } else if (week.phase === 'genre') {
       actions.push(`<a href="/random-genre/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${week.date}')">Random Genre</a>`);
     } else if (week.phase === 'nomination') {
-      actions.push(`<a href="/nominate/${week.date}" class="btn btn-success" onclick="return checkUserAndGo('/nominate/${week.date}')">Nominate Film</a>`);
+      actions.push(`<a href="/nominate/${week.date}" class="btn btn-success" onclick="return checkUserAndGoWithUser('/nominate/${week.date}')">Nominate Film</a>`);
       actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
     } else if (week.phase === 'voting') {
       actions.push(`<a href="/vote/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/vote/${week.date}')">Vote</a>`);
@@ -186,6 +186,17 @@ app.get('/', (req, res) => {
                 return false;
               }
               window.location.href = url;
+            }
+
+            // Check user and pass user parameter
+            function checkUserAndGoWithUser(baseUrl) {
+              const user = getCurrentUser();
+              if (!user) {
+                alert('Please select your name first!');
+                return false;
+              }
+              window.location.href = baseUrl + '?user=' + encodeURIComponent(user);
+              return true;
             }
 
             // Check admin privileges before actions
