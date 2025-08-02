@@ -12,8 +12,6 @@ app.use(express.static('public')); // For CSS/JS files
 // Your TMDB API key
 const TMDB_API_KEY = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJhYzA3NTdjZGM1ZjU3MmYzN2VhMWE0OGU3ODdmOWU5OSIsIm5iZiI6MTc0MTQ4OTQwNi43NjMsInN1YiI6IjY3Y2QwNGZlNDJjNzUyMTI1MmY1ZDE3ZiIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.LW0oDgeFsv-dlssVgpI8klhDAWv3_CDNlIXd3ijK6KY';
 
-// We'll load members from database instead of hardcoding them
-
 // Predefined genres for random selection
 const GENRES = [
   'Action', 'Comedy', 'Drama', 'Horror', 'Sci-Fi', 
@@ -78,6 +76,11 @@ db.serialize(() => {
   });
 });
 
+// Helper function to get members from database
+function getMembers(callback) {
+  db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", callback);
+}
+
 // Helper function to get Monday of current week
 function getMondayOfWeek(date) {
   const d = new Date(date);
@@ -112,166 +115,6 @@ function generateWeeks() {
   return weeks;
 }
 
-// Helper function to get members from database
-function getMembers(callback) {
-  db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", callback);
-}
-
-// HOME PAGE - Shows calendar and current status
-app.get('/', (req, res) => {
-  const weeks = generateWeeks();
-  
-  // Get weeks from database with their current status
-  db.all(`SELECT * FROM weeks ORDER BY week_date`, (err, dbWeeks) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).send('Database error');
-    }
-
-    // Merge generated weeks with database data
-    const weeksData = weeks.map(week => {
-      const dbWeek = dbWeeks.find(w => w.week_date === week.date);
-      return {
-        ...week,
-        id: dbWeek?.id,
-        genre: dbWeek?.genre,
-        phase: dbWeek?.phase || 'planning',
-        created_by: dbWeek?.created_by
-      };
-    });
-
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Film Club</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          body { 
-            font-family: Arial, sans-serif; 
-            margin: 0;
-            padding: 20px;
-            background: #f5f5f5;
-          }
-          .container { max-width: 1200px; margin: 0 auto; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .week-card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-          }
-          .week-info h3 { margin: 0 0 10px 0; color: #333; }
-          .week-info p { margin: 5px 0; color: #666; }
-          .phase-badge {
-            padding: 5px 10px;
-            border-radius: 15px;
-            font-size: 12px;
-            font-weight: bold;
-            text-transform: uppercase;
-          }
-          .phase-planning { background: #e3f2fd; color: #1976d2; }
-          .phase-genre { background: #fff3e0; color: #f57c00; }
-          .phase-nomination { background: #e8f5e8; color: #388e3c; }
-          .phase-voting { background: #fce4ec; color: #c2185b; }
-          .phase-complete { background: #f3e5f5; color: #7b1fa2; }
-          .actions {
-            display: flex;
-            gap: 10px;
-          }
-          .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            text-decoration: none;
-            font-size: 14px;
-          }
-          .btn-primary { background: #2196f3; color: white; }
-          .btn-success { background: #4caf50; color: white; }
-          .btn-warning { background: #ff9800; color: white; }
-          .user-select {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-          }
-          select { padding: 5px; }
-        </style>
-      </head>
-      <body>
-        <div class="user-select">
-          <label>You are: </label>
-          <select id="currentUser" onchange="setCurrentUser()">
-            <option value="">Select your name</option>
-            ${CLUB_MEMBERS.map(member => `<option value="${member}">${member}</option>`).join('')}
-          </select>
-        </div>
-
-        <div class="container">
-          <div class="header">
-            <h1>🎬 Film Club Calendar</h1>
-            <p>Manage your weekly film selections and voting</p>
-          </div>
-
-          ${weeksData.map(week => `
-            <div class="week-card">
-              <div class="week-info">
-                <h3>${week.displayDate}</h3>
-                <p><strong>Genre:</strong> ${week.genre || 'Not set'}</p>
-                ${week.created_by ? `<p><strong>Set by:</strong> ${week.created_by}</p>` : ''}
-              </div>
-              <div class="actions">
-                <span class="phase-badge phase-${week.phase}">${week.phase}</span>
-                ${getWeekActions(week)}
-              </div>
-            </div>
-          `).join('')}
-        </div>
-
-        <script>
-          // Save current user in browser storage
-          function setCurrentUser() {
-            const user = document.getElementById('currentUser').value;
-            localStorage.setItem('currentUser', user);
-          }
-
-          // Load current user on page load
-          window.onload = function() {
-            const savedUser = localStorage.getItem('currentUser');
-            if (savedUser) {
-              document.getElementById('currentUser').value = savedUser;
-            }
-          }
-
-          // Helper function to check if user is selected
-          function getCurrentUser() {
-            return localStorage.getItem('currentUser');
-          }
-
-          // Check user before actions
-          function checkUserAndGo(url) {
-            const user = getCurrentUser();
-            if (!user) {
-              alert('Please select your name first!');
-              return false;
-            }
-            window.location.href = url;
-          }
-        </script>
-      </body>
-      </html>
-    `);
-  });
-});
-
 // Helper function to generate action buttons for each week
 function getWeekActions(week) {
   const actions = [];
@@ -288,6 +131,188 @@ function getWeekActions(week) {
   
   return actions.join('');
 }
+
+// HOME PAGE - Shows calendar and current status
+app.get('/', (req, res) => {
+  const weeks = generateWeeks();
+  
+  // Get members first, then weeks
+  getMembers((err, members) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Database error');
+    }
+
+    // Get weeks from database with their current status
+    db.all(`SELECT * FROM weeks ORDER BY week_date`, (err, dbWeeks) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).send('Database error');
+      }
+
+      // Merge generated weeks with database data
+      const weeksData = weeks.map(week => {
+        const dbWeek = dbWeeks.find(w => w.week_date === week.date);
+        return {
+          ...week,
+          id: dbWeek?.id,
+          genre: dbWeek?.genre,
+          phase: dbWeek?.phase || 'planning',
+          created_by: dbWeek?.created_by
+        };
+      });
+
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Film Club</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              margin: 0;
+              padding: 20px;
+              background: #f5f5f5;
+            }
+            .container { max-width: 1200px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .nav-buttons {
+              text-align: center;
+              margin-bottom: 20px;
+            }
+            .nav-buttons a {
+              display: inline-block;
+              padding: 10px 20px;
+              margin: 0 10px;
+              background: #2196f3;
+              color: white;
+              text-decoration: none;
+              border-radius: 4px;
+            }
+            .nav-buttons a:hover { background: #1976d2; }
+            .week-card {
+              background: white;
+              border-radius: 8px;
+              padding: 20px;
+              margin-bottom: 15px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .week-info h3 { margin: 0 0 10px 0; color: #333; }
+            .week-info p { margin: 5px 0; color: #666; }
+            .phase-badge {
+              padding: 5px 10px;
+              border-radius: 15px;
+              font-size: 12px;
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .phase-planning { background: #e3f2fd; color: #1976d2; }
+            .phase-genre { background: #fff3e0; color: #f57c00; }
+            .phase-nomination { background: #e8f5e8; color: #388e3c; }
+            .phase-voting { background: #fce4ec; color: #c2185b; }
+            .phase-complete { background: #f3e5f5; color: #7b1fa2; }
+            .actions {
+              display: flex;
+              gap: 10px;
+            }
+            .btn {
+              padding: 8px 16px;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              text-decoration: none;
+              font-size: 14px;
+            }
+            .btn-primary { background: #2196f3; color: white; }
+            .btn-success { background: #4caf50; color: white; }
+            .btn-warning { background: #ff9800; color: white; }
+            .user-select {
+              position: fixed;
+              top: 20px;
+              right: 20px;
+              background: white;
+              padding: 10px;
+              border-radius: 8px;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            select { padding: 5px; }
+          </style>
+        </head>
+        <body>
+          <div class="user-select">
+            <label>You are: </label>
+            <select id="currentUser" onchange="setCurrentUser()">
+              <option value="">Select your name</option>
+              ${members.map(member => `<option value="${member.name}">${member.name}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="container">
+            <div class="header">
+              <h1>🎬 Film Club Calendar</h1>
+              <p>Manage your weekly film selections and voting</p>
+            </div>
+
+            <div class="nav-buttons">
+              <a href="/manage-users">👥 Manage Members</a>
+              <a href="/statistics">📊 Statistics</a>
+            </div>
+
+            ${weeksData.map(week => `
+              <div class="week-card">
+                <div class="week-info">
+                  <h3>${week.displayDate}</h3>
+                  <p><strong>Genre:</strong> ${week.genre || 'Not set'}</p>
+                  ${week.created_by ? `<p><strong>Set by:</strong> ${week.created_by}</p>` : ''}
+                </div>
+                <div class="actions">
+                  <span class="phase-badge phase-${week.phase}">${week.phase}</span>
+                  ${getWeekActions(week)}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <script>
+            // Save current user in browser storage
+            function setCurrentUser() {
+              const user = document.getElementById('currentUser').value;
+              localStorage.setItem('currentUser', user);
+            }
+
+            // Load current user on page load
+            window.onload = function() {
+              const savedUser = localStorage.getItem('currentUser');
+              if (savedUser) {
+                document.getElementById('currentUser').value = savedUser;
+              }
+            }
+
+            // Helper function to check if user is selected
+            function getCurrentUser() {
+              return localStorage.getItem('currentUser');
+            }
+
+            // Check user before actions
+            function checkUserAndGo(url) {
+              const user = getCurrentUser();
+              if (!user) {
+                alert('Please select your name first!');
+                return false;
+              }
+              window.location.href = url;
+            }
+          </script>
+        </body>
+        </html>
+      `);
+    });
+  });
+});
 
 // SET GENRE PAGE
 app.get('/set-genre/:date', (req, res) => {
