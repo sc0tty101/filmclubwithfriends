@@ -1,0 +1,82 @@
+/* Film Club Website Styles */
+
+body { 
+  font-family: Arial, sans-serif; 
+  margin: 0;
+  padding: 20px;
+  background: #f5f5f5;
+}
+
+.container { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+}
+
+.header { 
+  text-align: center; 
+  margin-bottom: 30px; 
+}
+
+.header h1 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.header p {
+  color: #666;
+  margin: 0;
+}
+
+/* Navigation */
+.nav-buttons {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.nav-buttons a {
+  display: inline-block;
+  padding: 10px 20px;
+  margin: 0 10px;
+  background: #2196f3;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background 0.3s;
+}
+
+.nav-buttons a:hover { 
+  background: #1976d2; 
+}
+
+/* Cards */
+.card {
+  background: white;
+  border-radius: 8px;
+  padding: 30px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.week-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Week Info */
+.week-info h3 { 
+  margin: 0 0 10px 0; 
+  color: #333; 
+}
+
+.week-info p { 
+  margin: 5px 0; 
+  color: #666; 
+}
+
+/*
