@@ -601,6 +601,59 @@ body {
   border-bottom: 1px solid #eee;
 }
 
+/* Voting Status Styles - ADD THESE TO YOUR EXISTING styles.css */
+
+/* Outlined Button Style for Completed Actions */
+.btn-outline {
+  background: transparent !important;
+  border: 2px solid currentColor;
+  position: relative;
+}
+
+.btn-outline:hover {
+  background: currentColor !important;
+  color: white !important;
+}
+
+/* Success Outline (for nominations) */
+.btn-success.btn-outline {
+  color: #4caf50;
+  border-color: #4caf50;
+}
+
+.btn-success.btn-outline:hover {
+  background: #4caf50 !important;
+  color: white !important;
+}
+
+/* Warning Outline (for votes) */
+.btn-warning.btn-outline {
+  color: #ff9800;
+  border-color: #ff9800;
+}
+
+.btn-warning.btn-outline:hover {
+  background: #ff9800 !important;
+  color: white !important;
+}
+
+/* Checkmark styling */
+.btn-outline::before {
+  content: '';
+  display: inline-block;
+  margin-right: 5px;
+}
+
+/* Optional: Add subtle animation to completed buttons */
+.btn-outline {
+  animation: subtle-pulse 2s infinite;
+}
+
+@keyframes subtle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
 /* Responsive Design for Film Components */
 @media (max-width: 768px) {
   .result-info {
