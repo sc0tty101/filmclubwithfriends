@@ -12,6 +12,7 @@ const genresRoutes = require('./routes/genres');
 const weeksRoutes = require('./routes/weeks');
 const adminRoutes = require('./routes/admin');
 const filmsRoutes = require('./routes/films');
+const votesRoutes = require('./routes/votes');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
@@ -30,6 +31,7 @@ app.use('/', genresRoutes);
 app.use('/', weeksRoutes);
 app.use('/', adminRoutes);
 app.use('/', filmsRoutes);
+app.use('/', votesRoutes);
 
 // HOME PAGE - Shows calendar and current status
 app.get('/', (req, res) => {
@@ -66,22 +68,24 @@ app.get('/', (req, res) => {
   }
 
   function getWeekActions(week) {
-  const actions = [];
-  
-  if (week.phase === 'planning') {
-    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${week.date}')">Set Genre</a>`);
-  } else if (week.phase === 'genre') {
-    actions.push(`<a href="/random-genre/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${week.date}')">Random Genre</a>`);
-  } else if (week.phase === 'nomination') {
-    actions.push(`<a href="#" class="btn btn-success" onclick="handleNominate('${week.date}')">Nominate Film</a>`);
-    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
-  } else if (week.phase === 'voting') {
-    actions.push(`<a href="/vote/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/vote/${week.date}')">Vote</a>`);
-    actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
+    const actions = [];
+    
+    if (week.phase === 'planning') {
+      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${week.date}')">Set Genre</a>`);
+    } else if (week.phase === 'genre') {
+      actions.push(`<a href="/random-genre/${week.date}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${week.date}')">Random Genre</a>`);
+    } else if (week.phase === 'nomination') {
+      actions.push(`<a href="/nominate/${week.date}" class="btn btn-success" onclick="return checkUserAndGoWithUser('/nominate/${week.date}')">Nominate Film</a>`);
+      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
+    } else if (week.phase === 'voting') {
+      actions.push(`<a href="/vote/${week.date}" class="btn btn-warning" onclick="return checkUserAndGoWithUser('/vote/${week.date}')">Vote</a>`);
+      actions.push(`<a href="/set-genre/${week.date}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${week.date}')">Change Genre</a>`);
+    } else if (week.phase === 'complete') {
+      actions.push(`<a href="/results/${week.date}" class="btn btn-success">View Results</a>`);
+    }
+    
+    return actions.join('');
   }
-  
-  return actions.join('');
-}
 
   const weeks = generateWeeks();
   
