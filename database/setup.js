@@ -44,7 +44,8 @@ db.serialize(() => {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    is_active INTEGER DEFAULT 1
+    is_active INTEGER DEFAULT 1,
+    is_admin INTEGER DEFAULT 0
   )`);
 
   // Genres table - stores available genres
@@ -54,9 +55,9 @@ db.serialize(() => {
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active INTEGER DEFAULT 1
   )`);
-}); // ← This closing bracket was missing!
+});
 
-// Helper functions (these need to be OUTSIDE the serialize block)
+// Helper functions
 function getMembers(callback) {
   db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", callback);
 }
