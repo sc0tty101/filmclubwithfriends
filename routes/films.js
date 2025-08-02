@@ -305,23 +305,6 @@ router.post('/nominate/:date', (req, res) => {
   });
 });
 
-// MOVE TO VOTING PHASE
-router.post('/move-to-voting/:date', (req, res) => {
-  const weekDate = req.params.date;
-  
-  req.db.run(
-    "UPDATE weeks SET phase = 'voting' WHERE week_date = ?",
-    [weekDate],
-    function(err) {
-      if (err) {
-        console.error(err);
-        return res.status(500).send('Database error');
-      }
-      res.json({ success: true });
-    }
-  );
-});
-
 // DELETE NOMINATION
 router.post('/delete-nomination/:id', (req, res) => {
   const nominationId = req.params.id;
@@ -339,6 +322,23 @@ router.post('/delete-nomination/:id', (req, res) => {
         return res.json({ success: false, error: 'Nomination not found' });
       }
       
+      res.json({ success: true });
+    }
+  );
+});
+
+// MOVE TO VOTING PHASE
+router.post('/move-to-voting/:date', (req, res) => {
+  const weekDate = req.params.date;
+  
+  req.db.run(
+    "UPDATE weeks SET phase = 'voting' WHERE week_date = ?",
+    [weekDate],
+    function(err) {
+      if (err) {
+        console.error(err);
+        return res.status(500).send('Database error');
+      }
       res.json({ success: true });
     }
   );
