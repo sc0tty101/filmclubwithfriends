@@ -10,6 +10,7 @@ const db = require('./database/setup');
 const membersRoutes = require('./routes/members');
 const genresRoutes = require('./routes/genres');
 const weeksRoutes = require('./routes/weeks');
+const adminRoutes = require('./routes/admin');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
@@ -26,6 +27,7 @@ app.use((req, res, next) => {
 app.use('/', membersRoutes);
 app.use('/', genresRoutes);
 app.use('/', weeksRoutes);
+app.use('/', adminRoutes);
 
 // HOME PAGE - Shows calendar and current status
 app.get('/', (req, res) => {
