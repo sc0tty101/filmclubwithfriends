@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 
-// NOMINATION PAGE
+// ENHANCED NOMINATION PAGE - Replace the GET /nominate/:date route in routes/films.js
 router.get('/nominate/:date', (req, res) => {
   const weekDate = req.params.date;
-  const currentUser = req.query.user || 'Unknown'; // Get user from URL parameter
+  const currentUser = req.query.user || 'Unknown';
   
   // Get week info and existing nominations
   req.db.get("SELECT * FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
@@ -30,6 +30,7 @@ router.get('/nominate/:date', (req, res) => {
         // Check if current user already nominated
         const userNomination = nominations.find(nom => nom.user_name === currentUser);
         const canNominate = currentUser !== 'Unknown' && !userNomination;
+        const needsMoreFilms = nominations.length < 3;
 
         res.send(`
           <!DOCTYPE html>
@@ -46,17 +47,48 @@ router.get('/nominate/:date', (req, res) => {
                 <p><strong>Week:</strong> ${new Date(weekDate).toLocaleDateString()}</p>
                 <p><strong>Genre:</strong> ${week.genre}</p>
                 <p><strong>Current User:</strong> ${currentUser}</p>
+                
+                <!-- Progress Indicator -->
+                <div class="progress-indicator large">
+                  <div class="progress-step completed">
+                    <span class="step-icon">🎭</span>
+                    <span class="step-label">Genre Set</span>
+                  </div>
+                  <div class="progress-step active">
+                    <span class="step-icon">🎬</span>
+                    <span class="step-label">Nominations</span>
+                  </div>
+                  <div class="progress-step">
+                    <span class="step-icon">🗳️</span>
+                    <span class="step-label">Voting</span>
+                  </div>
+                  <div class="progress-step">
+                    <span class="step-icon">🏆</span>
+                    <span class="step-label">Results</span>
+                  </div>
+                </div>
               </div>
 
               <div class="card">
-                <h2>Current Nominations (${nominations.length})</h2>
+                <div class="section-header">
+                  <h2>Current Nominations</h2>
+                  <div class="nomination-progress">
+                    <span class="count-badge ${nominations.length >= 3 ? 'complete' : ''}">${nominations.length}</span>
+                    <span class="progress-text">
+                      ${nominations.length === 0 ? 'No nominations yet. Be the first!' : 
+                        nominations.length < 3 ? `Need ${3 - nominations.length} more nomination${3 - nominations.length !== 1 ? 's' : ''} to start voting` :
+                        'Ready for voting! 🎉'}
+                    </span>
+                  </div>
+                </div>
+                
                 <div class="nominations-list">
                   ${nominations.length === 0 ? 
-                    '<p style="text-align: center; color: #666;">No nominations yet. Be the first!</p>' :
+                    '<div class="empty-state"><p>No nominations yet. Be the first to nominate a film!</p></div>' :
                     nominations.map(nom => `
                       <div class="nomination-item">
                         <div class="film-info">
-                          ${nom.poster_url ? `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" alt="${nom.film_title}" class="film-poster">` : ''}
+                          ${nom.poster_url ? `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" alt="${nom.film_title}" class="film-poster">` : '<div class="poster-placeholder">No Image</div>'}
                           <div class="film-details">
                             <h4>${nom.film_title} (${nom.film_year})</h4>
                             <p><strong>Nominated by:</strong> ${nom.user_name}</p>
@@ -64,7 +96,7 @@ router.get('/nominate/:date', (req, res) => {
                         </div>
                         ${nom.user_name === currentUser ? `
                           <div class="nomination-actions">
-                            <button class="btn btn-secondary" onclick="editNomination(${nom.id}, '${nom.film_title}', '${nom.film_year}')">Edit</button>
+                            <button class="btn btn-secondary btn-small" onclick="editNomination(${nom.id}, '${nom.film_title}', '${nom.film_year}')">Edit</button>
                           </div>
                         ` : ''}
                       </div>
@@ -100,15 +132,38 @@ router.get('/nominate/:date', (req, res) => {
                 </div>
               ` : `
                 <div class="card">
-                  <div class="alert alert-error">
-                    ${currentUser === 'Unknown' ? 'Please select your name on the main page first.' : `You (${currentUser}) have already nominated a film for this week.`}
+                  <div class="alert ${currentUser === 'Unknown' ? 'alert-error' : 'alert-success'}">
+                    ${currentUser === 'Unknown' ? 
+                      'Please select your name on the main page first.' : 
+                      `You (${currentUser}) have already nominated a film for this week. You can edit your nomination above.`}
                   </div>
                 </div>
               `}
 
-              <div class="actions center">
-                <a href="/" class="btn btn-secondary">Back to Calendar</a>
-                ${nominations.length >= 3 ? '<button class="btn btn-success" onclick="moveToVoting()">Move to Voting Phase</button>' : ''}
+              <div class="card">
+                <div class="progress-actions">
+                  <a href="/" class="btn btn-secondary">Back to Calendar</a>
+                  
+                  ${needsMoreFilms ? `
+                    <div class="voting-status">
+                      <button class="btn btn-success" disabled title="Need at least 3 films to start voting">
+                        🗳️ Start Voting
+                      </button>
+                      <div class="voting-requirement">
+                        <span class="requirement-text">Need ${3 - nominations.length} more nomination${3 - nominations.length !== 1 ? 's' : ''} to start voting</span>
+                        <div class="mini-progress">
+                          ${Array.from({length: 3}, (_, i) => `
+                            <div class="mini-dot ${i < nominations.length ? 'filled' : ''}"></div>
+                          `).join('')}
+                        </div>
+                      </div>
+                    </div>
+                  ` : `
+                    <button class="btn btn-success btn-large" onclick="moveToVoting()">
+                      🗳️ Start Voting Phase (${nominations.length} films ready)
+                    </button>
+                  `}
+                </div>
               </div>
             </div>
 
@@ -168,7 +223,7 @@ router.get('/nominate/:date', (req, res) => {
               document.getElementById('selectedFilm').innerHTML = \`
                 <h3>Selected Film:</h3>
                 <div class="selected-film-display">
-                  \${posterPath ? \`<img src="https://image.tmdb.org/t/p/w154\${posterPath}" alt="\${title}" class="selected-poster">\` : ''}
+                  \${posterPath ? \`<img src="https://image.tmdb.org/t/p/w154\${posterPath}" alt="\${title}" class="selected-poster">\` : '<div class="selected-poster-placeholder">No Image</div>'}
                   <div class="selected-details">
                     <h4>\${title} (\${year})</h4>
                   </div>
@@ -206,7 +261,7 @@ router.get('/nominate/:date', (req, res) => {
               .then(response => response.json())
               .then(data => {
                 if (data.success) {
-                  window.location.reload(); // Refresh to show new nomination
+                  window.location.reload();
                 } else {
                   showError(data.error || 'Failed to nominate film');
                 }
@@ -224,12 +279,10 @@ router.get('/nominate/:date', (req, res) => {
             
             function editNomination(nominationId, currentTitle, currentYear) {
               if (confirm(\`Replace "\${currentTitle} (\${currentYear})" with a new film?\`)) {
-                // Delete the current nomination
                 fetch('/delete-nomination/' + nominationId, { method: 'POST' })
                   .then(response => response.json())
                   .then(data => {
                     if (data.success) {
-                      // Refresh the page to show updated nominations and allow new nomination
                       window.location.reload();
                     } else {
                       alert('Failed to remove current nomination');
@@ -242,6 +295,12 @@ router.get('/nominate/:date', (req, res) => {
             }
             
             function moveToVoting() {
+              const user = localStorage.getItem('currentUser');
+              if (!user) {
+                alert('Please select your name on the main page first!');
+                return false;
+              }
+              
               if (confirm('Move this week to voting phase? Members will no longer be able to nominate films.')) {
                 fetch('/move-to-voting/${weekDate}', { method: 'POST' })
                   .then(() => window.location.href = '/')
