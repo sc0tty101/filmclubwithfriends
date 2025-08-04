@@ -931,6 +931,533 @@ body {
   }
 }
 
+/* ADD THESE NEW STYLES TO YOUR EXISTING public/styles.css FILE */
+
+/* Progress Indicator Styles */
+.progress-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin: 20px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.progress-indicator.large {
+  padding: 20px;
+  margin: 25px 0;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  position: relative;
+  opacity: 0.4;
+  transition: all 0.3s ease;
+}
+
+.progress-step.active {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.progress-step.completed {
+  opacity: 0.8;
+  color: #4caf50;
+}
+
+.progress-step.completed .step-icon {
+  background: #4caf50;
+  color: white;
+}
+
+.step-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.3s ease;
+}
+
+.progress-step.active .step-icon {
+  background: #2196f3;
+  color: white;
+  box-shadow: 0 0 10px rgba(33, 150, 243, 0.3);
+}
+
+.step-label {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Add connecting lines between steps */
+.progress-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  right: -15px;
+  width: 30px;
+  height: 2px;
+  background: #e0e0e0;
+  z-index: -1;
+}
+
+.progress-step.completed:not(:last-child)::after {
+  background: #4caf50;
+}
+
+/* Enhanced Week Cards */
+.week-info {
+  flex: 1;
+}
+
+.genre-info {
+  margin-bottom: 15px;
+}
+
+.genre-creator {
+  color: #666;
+  font-size: 14px;
+  margin-left: 10px;
+}
+
+.week-status {
+  margin-top: 10px;
+}
+
+.status-text {
+  background: #e3f2fd;
+  color: #1976d2;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Section Headers */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.section-header h2 {
+  margin: 0;
+  color: #333;
+}
+
+/* Nomination Progress */
+.nomination-progress, .voting-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.count-badge {
+  background: #2196f3;
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.count-badge.complete {
+  background: #4caf50;
+}
+
+.progress-text {
+  font-size: 14px;
+  color: #666;
+}
+
+/* Enhanced Nomination Items */
+.nomination-item {
+  padding: 15px;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nomination-item:last-child {
+  border-bottom: none;
+}
+
+.poster-placeholder, .selected-poster-placeholder {
+  width: 60px;
+  height: 90px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #999;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.selected-poster-placeholder {
+  width: 100px;
+  height: 150px;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.empty-state p {
+  margin: 0;
+  font-style: italic;
+}
+
+/* Progress Actions */
+.progress-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.voting-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.voting-requirement {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.requirement-text {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+.mini-progress {
+  display: flex;
+  gap: 3px;
+}
+
+.mini-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e0e0e0;
+}
+
+.mini-dot.filled {
+  background: #4caf50;
+}
+
+/* Enhanced Button Styles */
+.btn-large {
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+  background: inherit !important;
+}
+
+/* Enhanced Voting Styles */
+.film-ranking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: white;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: move;
+  transition: all 0.3s ease;
+}
+
+.ranking-item:hover {
+  border-color: #2196f3;
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.2);
+}
+
+.ranking-item.dragging {
+  transform: rotate(5deg);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Rank highlighting */
+.ranking-item.rank-1 {
+  border-color: #ffd700;
+  background: linear-gradient(135deg, #fff9e6, #fffbf0);
+}
+
+.ranking-item.rank-2 {
+  border-color: #c0c0c0;
+  background: linear-gradient(135deg, #f8f8f8, #ffffff);
+}
+
+.ranking-item.rank-3 {
+  border-color: #cd7f32;
+  background: linear-gradient(135deg, #fff4e6, #fffaf0);
+}
+
+.drag-handle {
+  color: #999;
+  font-size: 16px;
+  cursor: grab;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.rank-number {
+  background: #666;
+  color: white;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.ranking-item.rank-1 .rank-number {
+  background: #ffd700;
+  color: #8b4513;
+}
+
+.ranking-item.rank-2 .rank-number {
+  background: #c0c0c0;
+  color: #333;
+}
+
+.ranking-item.rank-3 .rank-number {
+  background: #cd7f32;
+  color: white;
+}
+
+.points-display {
+  margin-left: auto;
+  text-align: center;
+}
+
+.points {
+  background: #2196f3;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.voting-help {
+  background: #e3f2fd;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.voting-help p {
+  margin: 0;
+  color: #1976d2;
+}
+
+/* Vote Summary Styles */
+.vote-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.vote-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.vote-rank {
+  background: #666;
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.vote-film {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.vote-poster {
+  width: 40px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.vote-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vote-points {
+  font-size: 12px;
+  color: #666;
+}
+
+/* All Nominations Display */
+.all-nominations {
+  margin-top: 20px;
+}
+
+.all-nominations h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.nomination-display {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.nomination-display:last-child {
+  border-bottom: none;
+}
+
+/* Voting Instructions */
+.voting-instructions {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  padding: 10px 15px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+}
+
+.voting-instructions strong {
+  color: #8b4513;
+}
+
+/* Mobile Responsive Enhancements */
+@media (max-width: 768px) {
+  .progress-indicator {
+    gap: 10px;
+    padding: 10px;
+  }
+  
+  .step-icon {
+    width: 35px;
+    height: 35px;
+    font-size: 16px;
+  }
+  
+  .step-label {
+    font-size: 10px;
+  }
+  
+  .progress-step:not(:last-child)::after {
+    width: 20px;
+    right: -10px;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .progress-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .ranking-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+  
+  .drag-handle {
+    order: -1;
+  }
+  
+  .points-display {
+    margin-left: 0;
+  }
+  
+  .vote-item {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+  
+  .vote-film {
+    flex-direction: column;
+    align-items: center;
+  }
+}
 
 /* Responsive Design for Film Components */
 @media (max-width: 768px) {
