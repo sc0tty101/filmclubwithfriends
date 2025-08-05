@@ -162,7 +162,6 @@ app.get('/', (req, res) => {
                 </div>
 
                 <div class="nav-buttons">
-                  <a href="/manage-users">👥 Manage Members</a>
                   <a href="/manage-genres">🎭 Manage Genres</a>
                   <a href="/statistics">📊 Statistics</a>
                   <a href="/admin/import-genres" id="adminLink" style="display: none;">🔧 Admin</a>
