@@ -13,7 +13,9 @@ db.serialize(() => {
     genre_source TEXT,
     phase TEXT DEFAULT 'planning',
     created_by TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    winner_film_id INTEGER,
+    winner_score INTEGER
   )`);
 
   // Nominations table - stores film nominations
