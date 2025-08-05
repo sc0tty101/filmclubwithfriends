@@ -253,4 +253,108 @@ router.get('/results/:date', (req, res) => {
   });
 });
 
+// CALCULATE RESULTS - This is the missing route that was causing your error!
+router.post('/calculate-results/:date', (req, res) => {
+  const weekDate = req.params.date;
+  
+  console.log('Calculating results for week:', weekDate); // Debug log
+  
+  // Get week info
+  req.db.get("SELECT * FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
+    if (err || !week) {
+      console.error('Week not found:', err);
+      return res.json({ success: false, error: 'Week not found' });
+    }
+    
+    console.log('Found week:', week); // Debug log
+    
+    // Get all votes for this week
+    req.db.all(
+      "SELECT votes_json FROM votes WHERE week_id = ?",
+      [week.id],
+      (err, votes) => {
+        if (err) {
+          console.error('Error getting votes:', err);
+          return res.json({ success: false, error: 'Database error getting votes' });
+        }
+        
+        console.log('Found votes:', votes.length); // Debug log
+        
+        if (votes.length === 0) {
+          return res.json({ success: false, error: 'No votes found for this week' });
+        }
+        
+        // Calculate total points for each film
+        const filmScores = {};
+        
+        votes.forEach(vote => {
+          try {
+            const voteData = JSON.parse(vote.votes_json);
+            console.log('Processing vote:', voteData); // Debug log
+            
+            Object.entries(voteData).forEach(([filmId, points]) => {
+              filmScores[filmId] = (filmScores[filmId] || 0) + points;
+            });
+          } catch (e) {
+            console.error('Error parsing vote:', e);
+          }
+        });
+        
+        console.log('Film scores:', filmScores); // Debug log
+        
+        // Find winner
+        let winnerId = null;
+        let highestScore = 0;
+        
+        Object.entries(filmScores).forEach(([filmId, score]) => {
+          if (score > highestScore) {
+            highestScore = score;
+            winnerId = filmId;
+          }
+        });
+        
+        if (!winnerId) {
+          return res.json({ success: false, error: 'No winner could be determined' });
+        }
+        
+        console.log('Winner ID:', winnerId, 'Score:', highestScore); // Debug log
+        
+        // Get winner film details
+        req.db.get(
+          "SELECT film_title, film_year FROM nominations WHERE id = ?",
+          [winnerId],
+          (err, winnerFilm) => {
+            if (err || !winnerFilm) {
+              console.error('Winner film not found:', err);
+              return res.json({ success: false, error: 'Winner film not found' });
+            }
+            
+            console.log('Winner film:', winnerFilm); // Debug log
+            
+            // Update week to complete and store winner
+            req.db.run(
+              "UPDATE weeks SET phase = 'complete', winner_film_id = ?, winner_score = ? WHERE id = ?",
+              [winnerId, highestScore, week.id],
+              function(err) {
+                if (err) {
+                  console.error('Error saving results:', err);
+                  return res.json({ success: false, error: 'Failed to save results' });
+                }
+                
+                console.log('Results saved successfully!'); // Debug log
+                
+                res.json({ 
+                  success: true, 
+                  winner: `${winnerFilm.film_title} (${winnerFilm.film_year})`,
+                  score: highestScore
+                });
+              }
+            );
+          }
+        );
+      }
+    );
+  });
+});
+
 module.exports = router;
