@@ -129,78 +129,138 @@ router.post('/admin/import-genres', (req, res) => {
 
 // Handle database reset
 router.post('/admin/reset-database', (req, res) => {
+  const sqlite3 = require('sqlite3').verbose();
   const databasePath = '/data/filmclub.db';
   
-  try {
-    // Close the current database connection
-    req.db.close((err) => {
-      if (err) {
-        console.error('Error closing database:', err);
+  console.log('Starting database reset...');
+  
+  // Close current database connection
+  req.db.close((closeErr) => {
+    if (closeErr) {
+      console.error('Error closing database:', closeErr);
+    }
+    
+    // Delete the database file
+    try {
+      if (fs.existsSync(databasePath)) {
+        fs.unlinkSync(databasePath);
+        console.log('Old database deleted');
       }
       
-      // Delete the database file
-      try {
-        fs.unlinkSync(databasePath);
-        console.log('Database file deleted successfully');
-        
-        // Send response and restart server to recreate database
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Database Reset - Film Club</title>
-            <link rel="stylesheet" href="/styles.css">
-          </head>
-          <body>
-            <div class="container">
-              <div class="card">
-                <h1>✅ Database Reset Complete!</h1>
-                <p>The database has been successfully deleted and will be recreated with the latest schema when you restart the application.</p>
-                <p><strong>Next step:</strong> Restart your server to create a fresh database.</p>
-                
-                <div class="actions">
-                  <a href="/manage-users" class="btn btn-primary">Add Members</a>
-                  <a href="/manage-genres" class="btn btn-secondary">Add Genres</a>
-                  <a href="/" class="btn btn-secondary">Back to Calendar</a>
+      // Create new database with fresh schema
+      const newDb = new sqlite3.Database(databasePath);
+      
+      newDb.serialize(() => {
+        // Recreate all tables with latest schema
+        newDb.run(`CREATE TABLE weeks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          week_date TEXT NOT NULL,
+          genre TEXT,
+          genre_source TEXT,
+          phase TEXT DEFAULT 'planning',
+          created_by TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          winner_film_id INTEGER,
+          winner_score INTEGER
+        )`);
+
+        newDb.run(`CREATE TABLE nominations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          week_id INTEGER,
+          user_name TEXT,
+          film_title TEXT,
+          film_year INTEGER,
+          poster_url TEXT,
+          tmdb_id INTEGER,
+          nominated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (week_id) REFERENCES weeks(id)
+        )`);
+
+        newDb.run(`CREATE TABLE votes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          week_id INTEGER,
+          user_name TEXT,
+          votes_json TEXT,
+          voted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (week_id) REFERENCES weeks(id)
+        )`);
+
+        newDb.run(`CREATE TABLE members (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT UNIQUE NOT NULL,
+          added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          is_active INTEGER DEFAULT 1,
+          is_admin INTEGER DEFAULT 0
+        )`);
+
+        newDb.run(`CREATE TABLE genres (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT UNIQUE NOT NULL,
+          added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          is_active INTEGER DEFAULT 1
+        )`, (err) => {
+          if (err) {
+            console.error('Error creating tables:', err);
+            return res.status(500).send('Error recreating database');
+          }
+          
+          console.log('Database reset complete - new schema created');
+          
+          // Close the new database connection
+          newDb.close();
+          
+          // Send success response
+          res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Database Reset Complete - Film Club</title>
+              <link rel="stylesheet" href="/styles.css">
+            </head>
+            <body>
+              <div class="container">
+                <div class="card">
+                  <h1>✅ Database Reset Complete!</h1>
+                  <p>The database has been successfully reset with the latest schema.</p>
+                  <p><strong>Fresh start:</strong> All tables have been recreated and are ready to use.</p>
+                  
+                  <div class="actions">
+                    <a href="/manage-users" class="btn btn-primary">Add Members</a>
+                    <a href="/manage-genres" class="btn btn-secondary">Add Genres</a>
+                    <a href="/" class="btn btn-success">Back to Calendar</a>
+                  </div>
                 </div>
               </div>
-            </div>
-          </body>
-          </html>
-        `);
-        
-        // Force process exit to restart (Railway will automatically restart)
-        setTimeout(() => process.exit(0), 1000);
-        
-      } catch (deleteErr) {
-        console.error('Error deleting database file:', deleteErr);
-        res.status(500).send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Reset Error - Film Club</title>
-            <link rel="stylesheet" href="/styles.css">
-          </head>
-          <body>
-            <div class="container">
-              <div class="card">
-                <h1>❌ Reset Failed</h1>
-                <p>Error deleting database: ${deleteErr.message}</p>
-                <div class="actions">
-                  <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
-                </div>
+            </body>
+            </html>
+          `);
+        });
+      });
+      
+    } catch (err) {
+      console.error('Error during database reset:', err);
+      res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Reset Error - Film Club</title>
+          <link rel="stylesheet" href="/styles.css">
+        </head>
+        <body>
+          <div class="container">
+            <div class="card">
+              <h1>❌ Reset Failed</h1>
+              <p>Error resetting database: ${err.message}</p>
+              <div class="actions">
+                <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
               </div>
             </div>
-          </body>
-          </html>
-        `);
-      }
-    });
-    
-  } catch (err) {
-    console.error('Error during database reset:', err);
-    res.status(500).send('Database reset failed: ' + err.message);
-  }
+          </div>
+        </body>
+        </html>
+      `);
+    }
+  });
 });
 
 module.exports = router;
