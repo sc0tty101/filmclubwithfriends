@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
 
 // Bulk genre import page
 router.get('/admin/import-genres', (req, res) => {
@@ -31,6 +32,22 @@ Adventures
               <a href="/" class="btn btn-secondary">Cancel</a>
             </div>
           </form>
+        </div>
+
+        <div class="card">
+          <h1>🗃️ Database Management</h1>
+          <p><strong>⚠️ Development Tools - Use with caution!</strong></p>
+          
+          <div style="margin-bottom: 20px;">
+            <h3>Reset Database</h3>
+            <p>This will completely wipe all data and recreate the database with the latest schema. 
+               Useful for applying schema changes during development.</p>
+            <p><strong>⚠️ This will delete:</strong> All weeks, nominations, votes, members, and genres!</p>
+            
+            <form action="/admin/reset-database" method="POST" onsubmit="return confirm('Are you absolutely sure? This will delete ALL data and cannot be undone!')">
+              <button type="submit" class="btn btn-danger">🗑️ Reset Database</button>
+            </form>
+          </div>
         </div>
       </div>
     </body>
@@ -108,6 +125,82 @@ router.post('/admin/import-genres', (req, res) => {
       }
     );
   });
+});
+
+// Handle database reset
+router.post('/admin/reset-database', (req, res) => {
+  const databasePath = '/data/filmclub.db';
+  
+  try {
+    // Close the current database connection
+    req.db.close((err) => {
+      if (err) {
+        console.error('Error closing database:', err);
+      }
+      
+      // Delete the database file
+      try {
+        fs.unlinkSync(databasePath);
+        console.log('Database file deleted successfully');
+        
+        // Send response and restart server to recreate database
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Database Reset - Film Club</title>
+            <link rel="stylesheet" href="/styles.css">
+          </head>
+          <body>
+            <div class="container">
+              <div class="card">
+                <h1>✅ Database Reset Complete!</h1>
+                <p>The database has been successfully deleted and will be recreated with the latest schema when you restart the application.</p>
+                <p><strong>Next step:</strong> Restart your server to create a fresh database.</p>
+                
+                <div class="actions">
+                  <a href="/manage-users" class="btn btn-primary">Add Members</a>
+                  <a href="/manage-genres" class="btn btn-secondary">Add Genres</a>
+                  <a href="/" class="btn btn-secondary">Back to Calendar</a>
+                </div>
+              </div>
+            </div>
+          </body>
+          </html>
+        `);
+        
+        // Force process exit to restart (Railway will automatically restart)
+        setTimeout(() => process.exit(0), 1000);
+        
+      } catch (deleteErr) {
+        console.error('Error deleting database file:', deleteErr);
+        res.status(500).send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Reset Error - Film Club</title>
+            <link rel="stylesheet" href="/styles.css">
+          </head>
+          <body>
+            <div class="container">
+              <div class="card">
+                <h1>❌ Reset Failed</h1>
+                <p>Error deleting database: ${deleteErr.message}</p>
+                <div class="actions">
+                  <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
+                </div>
+              </div>
+            </div>
+          </body>
+          </html>
+        `);
+      }
+    });
+    
+  } catch (err) {
+    console.error('Error during database reset:', err);
+    res.status(500).send('Database reset failed: ' + err.message);
+  }
 });
 
 module.exports = router;
