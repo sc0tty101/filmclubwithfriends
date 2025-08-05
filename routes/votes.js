@@ -333,33 +333,33 @@ router.get('/vote/:date', (req, res) => {
                       }
                     }
                     
-function moveToComplete() {
-  if (confirm('Calculate final results? This will end the voting phase.')) {
-    console.log('About to calculate results for:', '${weekDate}'); // Debug log
-    
-    fetch('/calculate-results/${weekDate}', { method: 'POST' })
-      .then(response => {
-        console.log('Response status:', response.status); // Debug log
-        return response.json();
-      })
-      .then(data => {
-        console.log('Response data:', data); // Debug log
-        
-        if (data.success) {
-          alert('Results calculated! Winner: ' + data.winner);
-          window.location.href = '/';
-        } else {
-          // Show the actual error message instead of generic "Error calculating results"
-          alert('Error calculating results: ' + (data.error || 'Unknown error'));
-          console.error('Server error:', data);
-        }
-      })
-      .catch(error => {
-        console.error('Network error:', error);
-        alert('Network error calculating results: ' + error.message);
-      });
-  }
-}
+                    function moveToComplete() {
+                      if (confirm('Calculate final results? This will end the voting phase.')) {
+                        console.log('About to calculate results for:', '${weekDate}'); // Debug log
+                        
+                        fetch('/calculate-results/${weekDate}', { method: 'POST' })
+                          .then(response => {
+                            console.log('Response status:', response.status); // Debug log
+                            return response.json();
+                          })
+                          .then(data => {
+                            console.log('Response data:', data); // Debug log
+                            
+                            if (data.success) {
+                              alert('Results calculated! Winner: ' + data.winner);
+                              window.location.href = '/';
+                            } else {
+                              // Show the actual error message instead of generic "Error calculating results"
+                              alert('Error calculating results: ' + (data.error || 'Unknown error'));
+                              console.error('Server error:', data);
+                            }
+                          })
+                          .catch(error => {
+                            console.error('Network error:', error);
+                            alert('Network error calculating results: ' + error.message);
+                          });
+                      }
+                    }
                     
                     // Initialize dragging when page loads
                     window.onload = function() {
@@ -429,86 +429,6 @@ router.post('/vote/:date', (req, res) => {
   });
 });
 
-// CALCULATE RESULTS
-router.post('/calculate-results/:date', (req, res) => {
-  const weekDate = req.params.date;
-  
-  // Get week info
-  req.db.get("SELECT * FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
-    if (err || !week) {
-      return res.json({ success: false, error: 'Week not found' });
-    }
-    
-    // Get all votes for this week
-    req.db.all(
-      "SELECT votes_json FROM votes WHERE week_id = ?",
-      [week.id],
-      (err, votes) => {
-        if (err) {
-          console.error(err);
-          return res.json({ success: false, error: 'Database error' });
-        }
-        
-        // Calculate total points for each film
-        const filmScores = {};
-        
-        votes.forEach(vote => {
-          try {
-            const voteData = JSON.parse(vote.votes_json);
-            Object.entries(voteData).forEach(([filmId, points]) => {
-              filmScores[filmId] = (filmScores[filmId] || 0) + points;
-            });
-          } catch (e) {
-            console.error('Error parsing vote:', e);
-          }
-        });
-        
-        // Find winner
-        let winnerId = null;
-        let highestScore = 0;
-        
-        Object.entries(filmScores).forEach(([filmId, score]) => {
-          if (score > highestScore) {
-            highestScore = score;
-            winnerId = filmId;
-          }
-        });
-        
-        if (!winnerId) {
-          return res.json({ success: false, error: 'No votes found' });
-        }
-        
-        // Get winner film details
-        req.db.get(
-          "SELECT film_title, film_year FROM nominations WHERE id = ?",
-          [winnerId],
-          (err, winnerFilm) => {
-            if (err || !winnerFilm) {
-              return res.json({ success: false, error: 'Winner film not found' });
-            }
-            
-            // Update week to complete and store winner
-            req.db.run(
-              "UPDATE weeks SET phase = 'complete', winner_film_id = ?, winner_score = ? WHERE id = ?",
-              [winnerId, highestScore, week.id],
-              function(err) {
-                if (err) {
-                  console.error(err);
-                  return res.json({ success: false, error: 'Failed to save results' });
-                }
-                
-                res.json({ 
-                  success: true, 
-                  winner: `${winnerFilm.film_title} (${winnerFilm.film_year})`,
-                  score: highestScore
-                });
-              }
-            );
-          }
-        );
-      }
-    );
-  });
-});
+// NOTE: /calculate-results route has been moved to routes/results.js to avoid duplicate routes
 
 module.exports = router;
