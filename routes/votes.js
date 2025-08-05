@@ -333,21 +333,33 @@ router.get('/vote/:date', (req, res) => {
                       }
                     }
                     
-                    function moveToComplete() {
-                      if (confirm('Calculate final results? This will end the voting phase.')) {
-                        fetch('/calculate-results/${weekDate}', { method: 'POST' })
-                          .then(response => response.json())
-                          .then(data => {
-                            if (data.success) {
-                              alert('Results calculated! Winner: ' + data.winner);
-                              window.location.href = '/';
-                            } else {
-                              alert('Error calculating results');
-                            }
-                          })
-                          .catch(error => alert('Error calculating results'));
-                      }
-                    }
+function moveToComplete() {
+  if (confirm('Calculate final results? This will end the voting phase.')) {
+    console.log('About to calculate results for:', '${weekDate}'); // Debug log
+    
+    fetch('/calculate-results/${weekDate}', { method: 'POST' })
+      .then(response => {
+        console.log('Response status:', response.status); // Debug log
+        return response.json();
+      })
+      .then(data => {
+        console.log('Response data:', data); // Debug log
+        
+        if (data.success) {
+          alert('Results calculated! Winner: ' + data.winner);
+          window.location.href = '/';
+        } else {
+          // Show the actual error message instead of generic "Error calculating results"
+          alert('Error calculating results: ' + (data.error || 'Unknown error'));
+          console.error('Server error:', data);
+        }
+      })
+      .catch(error => {
+        console.error('Network error:', error);
+        alert('Network error calculating results: ' + error.message);
+      });
+  }
+}
                     
                     // Initialize dragging when page loads
                     window.onload = function() {
