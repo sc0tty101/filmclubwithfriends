@@ -27,10 +27,10 @@ router.get('/set-genre/:date', (req, res) => {
             <h1>Set Genre for Week</h1>
             <p><strong>Week starting:</strong> ${new Date(weekDate).toLocaleDateString()}</p>
             
-            <form action="/set-genre/${weekDate}" method="POST">
+            <form action="/set-genre/${weekDate}" method="POST" onsubmit="return validateGenreForm()">
               <div class="form-group">
                 <label>Choose Genre:</label>
-                <select name="genre" required>
+                <select name="genre" id="genreSelect" onchange="clearCustomWhenDropdownSelected()">
                   <option value="">Select a genre...</option>
                   ${genres.map(genre => `<option value="${genre.name}">${genre.name}</option>`).join('')}
                 </select>
@@ -38,7 +38,7 @@ router.get('/set-genre/:date', (req, res) => {
               
               <div class="form-group">
                 <label>Or enter custom genre:</label>
-                <input type="text" name="customGenre" placeholder="e.g., XMAS FILMS, 80s Movies">
+                <input type="text" name="customGenre" id="customGenre" placeholder="e.g., XMAS FILMS, 80s Movies" oninput="clearDropdownWhenCustomTyped()">
               </div>
               
               <div class="actions">
@@ -51,6 +51,36 @@ router.get('/set-genre/:date', (req, res) => {
         </div>
 
         <script>
+        function validateGenreForm() {
+          const dropdown = document.getElementById('genreSelect').value;
+          const custom = document.getElementById('customGenre').value.trim();
+          
+          if (!dropdown && !custom) {
+            alert('Please either select a genre from the dropdown OR enter a custom genre.');
+            return false;
+          }
+          
+          return true;
+        }
+        
+        function clearCustomWhenDropdownSelected() {
+          const dropdown = document.getElementById('genreSelect');
+          const custom = document.getElementById('customGenre');
+          
+          if (dropdown.value) {
+            custom.value = '';
+          }
+        }
+        
+        function clearDropdownWhenCustomTyped() {
+          const dropdown = document.getElementById('genreSelect');
+          const custom = document.getElementById('customGenre');
+          
+          if (custom.value.trim()) {
+            dropdown.value = '';
+          }
+        }
+        
         function setRandomGenre() {
           const genreSelect = document.querySelector('select[name="genre"]');
           const options = Array.from(genreSelect.options).filter(option => option.value !== "");
@@ -59,6 +89,9 @@ router.get('/set-genre/:date', (req, res) => {
             const randomIndex = Math.floor(Math.random() * options.length);
             const randomOption = options[randomIndex];
             genreSelect.value = randomOption.value;
+            
+            // Clear custom field since we're using dropdown
+            document.getElementById('customGenre').value = '';
             
             // Submit the form
             document.querySelector('form').submit();
@@ -76,11 +109,14 @@ router.get('/set-genre/:date', (req, res) => {
 // HANDLE GENRE SETTING
 router.post('/set-genre/:date', (req, res) => {
   const weekDate = req.params.date;
-  const genre = req.body.customGenre || req.body.genre;
+  // Priority: custom genre first, then dropdown selection
+  const genre = (req.body.customGenre && req.body.customGenre.trim()) || req.body.genre;
   const currentUser = 'Unknown'; // We'll improve this later
   
+  console.log('Genre setting request:', { customGenre: req.body.customGenre, dropdownGenre: req.body.genre, finalGenre: genre }); // Debug log
+  
   if (!genre) {
-    return res.status(400).send('Genre is required');
+    return res.status(400).send('Genre is required - please select from dropdown or enter custom genre');
   }
 
   // Insert or update week in database
@@ -93,6 +129,8 @@ router.post('/set-genre/:date', (req, res) => {
         console.error(err);
         return res.status(500).send('Database error');
       }
+      
+      console.log('Genre set successfully:', genre); // Debug log
       res.redirect('/');
     }
   );
