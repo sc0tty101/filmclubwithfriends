@@ -49,6 +49,10 @@ Adventures
             </form>
           </div>
         </div>
+
+        <div class="actions">
+          <a href="/" class="btn btn-secondary">Back to Calendar</a>
+        </div>
       </div>
     </body>
     </html>
