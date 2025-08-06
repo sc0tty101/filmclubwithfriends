@@ -35,8 +35,30 @@ app.use('/', filmsRoutes);
 app.use('/', votesRoutes);
 app.use('/', resultsRoutes);
 
-// Replace the main home route in index.js with this improved version
+// API endpoint for current week films with enhanced data
+app.get('/api/week/:weekId/films', (req, res) => {
+  const weekId = req.params.weekId;
+  
+  // Get all nominations for this week with enhanced data
+  db.all(`
+    SELECT 
+      id, user_name, film_title, film_year, poster_url, backdrop_url,
+      vote_average, release_date, runtime, overview, director, tmdb_genres,
+      nominated_at
+    FROM nominations 
+    WHERE week_id = ? 
+    ORDER BY nominated_at
+  `, [weekId], (err, films) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    res.json({ films: films || [] });
+  });
+});
 
+// Main home route with enhanced current week display
 app.get('/', (req, res) => {
   // Helper functions
   function getMondayOfWeek(date) {
@@ -258,7 +280,6 @@ app.get('/', (req, res) => {
                 // Store user activity data
                 const userActivity = ${JSON.stringify(userActivity)};
                 
-                // [Include all your existing JavaScript functions here - they stay the same]
                 function setCurrentUser() {
                   const user = document.getElementById('currentUser').value;
                   localStorage.setItem('currentUser', user);
@@ -367,6 +388,123 @@ app.get('/', (req, res) => {
                   toggleAdminLink(user);
                 }
 
+                // Enhanced current week film display functions
+                function loadCurrentWeekFilms() {
+                  // Find current week element
+                  const currentWeekElement = document.querySelector('[id^="currentWeekFilms-"]');
+                  if (!currentWeekElement) return;
+                  
+                  const weekId = currentWeekElement.id.split('-')[1];
+                  
+                  // Fetch current week films with enhanced data
+                  fetch(\`/api/week/\${weekId}/films\`)
+                    .then(response => response.json())
+                    .then(data => {
+                      if (data.films && data.films.length > 0) {
+                        currentWeekElement.innerHTML = renderCurrentWeekFilms(data.films);
+                      }
+                    })
+                    .catch(error => {
+                      console.error('Error loading current week films:', error);
+                    });
+                }
+
+                function renderCurrentWeekFilms(films) {
+                  if (films.length === 1) {
+                    // Single film - hero display
+                    const film = films[0];
+                    return renderFilmShowcase(film);
+                  } else if (films.length > 1) {
+                    // Multiple films - grid display
+                    return \`
+                      <div class="current-week-grid">
+                        \${films.map(film => renderFilmCardCompact(film)).join('')}
+                      </div>
+                    \`;
+                  }
+                  return '';
+                }
+
+                function renderFilmShowcase(film) {
+                  const backdropUrl = film.backdrop_url ? \`https://image.tmdb.org/t/p/w1280\${film.backdrop_url}\` : '';
+                  const posterUrl = film.poster_url ? \`https://image.tmdb.org/t/p/w500\${film.poster_url}\` : '';
+                  const rating = film.vote_average ? parseFloat(film.vote_average).toFixed(1) : 'N/A';
+                  const runtime = film.runtime ? \`\${film.runtime} min\` : '';
+                  const releaseDate = film.release_date ? new Date(film.release_date).getFullYear() : '';
+                  
+                  return \`
+                    <div class="film-showcase">
+                      \${backdropUrl ? \`<img src="\${backdropUrl}" alt="\${film.film_title}" class="film-backdrop">\` : ''}
+                      <div class="film-backdrop-overlay"></div>
+                      
+                      <div class="film-content">
+                        \${posterUrl ? \`<img src="\${posterUrl}" alt="\${film.film_title}" class="film-poster-large">\` : ''}
+                        
+                        <div class="film-details-large">
+                          <h2 class="film-title-large">
+                            \${film.film_title} 
+                            <span class="film-year-large">(\${film.film_year})</span>
+                          </h2>
+                          
+                          <div class="film-meta-large">
+                            \${rating !== 'N/A' ? \`<div class="film-rating">\${rating}</div>\` : ''}
+                            \${releaseDate ? \`<span class="film-meta-item">\${releaseDate}</span>\` : ''}
+                            \${film.tmdb_genres ? \`<span class="film-meta-item">\${film.tmdb_genres}</span>\` : ''}
+                            \${runtime ? \`<span class="film-meta-item">\${runtime}</span>\` : ''}
+                          </div>
+                          
+                          \${film.overview ? \`
+                            <div class="film-overview-large">
+                              \${film.overview}
+                            </div>
+                          \` : ''}
+                          
+                          <div class="film-credits">
+                            \${film.director ? \`
+                              <div class="film-director">
+                                <strong>Director:</strong> \${film.director}
+                              </div>
+                            \` : ''}
+                            <div class="film-nominator">
+                              <strong>Nominated by:</strong> \${film.user_name}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  \`;
+                }
+
+                function renderFilmCardCompact(film) {
+                  const backdropUrl = film.backdrop_url ? \`https://image.tmdb.org/t/p/w500\${film.backdrop_url}\` : '';
+                  const posterUrl = film.poster_url ? \`https://image.tmdb.org/t/p/w200\${film.poster_url}\` : '';
+                  const rating = film.vote_average ? parseFloat(film.vote_average).toFixed(1) : 'N/A';
+                  const releaseDate = film.release_date ? new Date(film.release_date).getFullYear() : '';
+                  
+                  return \`
+                    <div class="film-card-compact">
+                      <div class="film-card-backdrop">
+                        \${backdropUrl ? \`<img src="\${backdropUrl}" alt="\${film.film_title}">\` : ''}
+                        \${posterUrl ? \`<img src="\${posterUrl}" alt="\${film.film_title}" class="film-card-poster">\` : ''}
+                      </div>
+                      
+                      <div class="film-card-content">
+                        <h4 class="film-card-title">\${film.film_title} (\${film.film_year})</h4>
+                        
+                        <div class="film-card-meta">
+                          \${rating !== 'N/A' ? \`<span class="film-card-rating">⭐ \${rating}</span>\` : ''}
+                          \${releaseDate ? \`<span>\${releaseDate}</span>\` : ''}
+                          \${film.runtime ? \`<span>\${film.runtime} min</span>\` : ''}
+                        </div>
+                        
+                        <div class="film-card-nominator">
+                          Nominated by \${film.user_name}
+                        </div>
+                      </div>
+                    </div>
+                  \`;
+                }
+
                 window.onload = function() {
                   const savedUser = localStorage.getItem('currentUser');
                   if (savedUser) {
@@ -374,6 +512,9 @@ app.get('/', (req, res) => {
                     toggleAdminLink(savedUser);
                     updateWeekActions(savedUser);
                   }
+                  
+                  // Load enhanced current week films
+                  loadCurrentWeekFilms();
                 }
                 </script>
               </body>
@@ -430,6 +571,13 @@ app.get('/', (req, res) => {
                     </div>
                   </div>
                 </div>
+                
+                ${week.isCurrentWeek && ['nomination', 'voting', 'complete'].includes(week.phase) ? `
+                  <!-- Enhanced Current Week Film Display -->
+                  <div class="current-week-films" id="currentWeekFilms-${week.id}">
+                    <!-- This will be populated by JavaScript with enhanced film data -->
+                  </div>
+                ` : ''}
               `;
             }
 
@@ -449,60 +597,3 @@ app.get('/', (req, res) => {
                       </div>
                       
                       ${week.winner ? `
-                        <div class="winner-line">
-                          <strong>🏆 Winner:</strong> ${week.winner.title} (${week.winner.year}) 
-                          <span class="nominator">by ${week.winner.nominator}</span>
-                        </div>
-                      ` : ''}
-                    </div>
-                  </div>
-                  
-                  <div class="compact-actions">
-                    ${week.phase === 'complete' ? `
-                      <a href="/results/${week.date}" class="btn btn-success btn-small">View Results</a>
-                    ` : week.phase === 'planning' ? `
-                      <div class="week-actions" data-week-id="${week.id}" data-week-date="${week.date}" data-week-phase="${week.phase}">
-                        <!-- Actions populated by JavaScript -->
-                      </div>
-                    ` : ''}
-                  </div>
-                </div>
-              `;
-            }
-          });
-        });
-      });
-    });
-  });
-});
-
-// STATISTICS PAGE (placeholder for now)
-app.get('/statistics', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Statistics - Film Club</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link rel="stylesheet" href="/styles/main.css">
-    </head>
-    <body>
-      <div class="container">
-        <div class="card">
-          <h1>📊 Statistics</h1>
-          <p>Statistics and awards features coming soon!</p>
-          <p>This will show member voting patterns, popular genres, and end-of-year awards.</p>
-          <br>
-          <a href="/" class="btn">Back to Calendar</a>
-        </div>
-      </div>
-    </body>
-    </html>
-  `);
-});
-
-// Start the server
-app.listen(port, () => {
-  console.log(`🎬 Film Club app running on port ${port}`);
-  console.log(`Visit http://localhost:${port} to get started!`);
-});
