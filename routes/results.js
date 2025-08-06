@@ -119,7 +119,7 @@ router.get('/results/:date', (req, res) => {
           <head>
             <title>Results - Film Club</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <link rel="stylesheet" href="/styles.css">
+            <link rel="stylesheet" href="/styles/main.css">
           </head>
           <body>
             <div class="container">
