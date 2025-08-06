@@ -15,6 +15,7 @@
 @import './components/navigation.css';
 @import './components/progress.css';
 @import './components/alerts.css';
+@import './components/current-week.css';
 
 /* Page-Specific Styles */
 @import './pages/homepage.css';
