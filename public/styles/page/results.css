@@ -1,0 +1,63 @@
+/* ==========================================================================
+   RESULTS PAGE STYLES
+   ========================================================================== */
+
+/* Winner Display */
+.winner-card {
+  border: 3px solid #fbbf24;
+  background: var(--winner-gradient);
+}
+
+.winner-display {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+  padding: var(--space-6);
+  background: var(--gold-gradient);
+  border-radius: var(--radius-xl);
+  border: 3px solid #f59e0b;
+}
+
+.winner-poster {
+  width: 140px;
+  height: 210px;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+  box-shadow: var(--shadow-xl);
+}
+
+.winner-details h3 {
+  margin: 0 0 var(--space-4) 0;
+  color: #8b4513;
+  font-size: 1.75rem;
+}
+
+.winner-details p {
+  margin: var(--space-2) 0;
+  color: #8b4513;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+/* Winner Stats */
+.winner-stats {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.stat-badge {
+  background: rgba(139, 69, 19, 0.1);
+  border: 2px solid #8b4513;
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  text-align: center;
+  min-width: 70px;
+}
+
+.stat-number {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #8b4
