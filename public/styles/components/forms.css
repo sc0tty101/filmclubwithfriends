@@ -1,0 +1,109 @@
+/* ==========================================================================
+   FORM COMPONENTS
+   ========================================================================== */
+
+.form-group {
+  margin-bottom: var(--space-5);
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+  color: var(--gray-700);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
+}
+
+.form-group label input[type="checkbox"] {
+  width: auto;
+  margin-right: var(--space-2);
+}
+
+/* Search Results */
+.search-results {
+  margin-top: var(--space-3);
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-md);
+  background: var(--white);
+}
+
+.search-result-item {
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--gray-200);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.search-result-item:hover {
+  background: var(--gray-50);
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.result-info {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.result-poster,
+.film-poster {
+  width: 60px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.poster-placeholder {
+  width: 60px;
+  height: 90px;
+  background: var(--gray-200);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  color: var(--gray-500);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.result-details {
+  flex: 1;
+}
+
+.result-details strong {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--gray-900);
+}
+
+.result-details p {
+  margin: 0;
+  color: var(--gray-600);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
