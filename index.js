@@ -597,3 +597,60 @@ app.get('/', (req, res) => {
                       </div>
                       
                       ${week.winner ? `
+                        <div class="winner-line">
+                          <strong>🏆 Winner:</strong> ${week.winner.title} (${week.winner.year}) 
+                          <span class="nominator">by ${week.winner.nominator}</span>
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
+                  
+                  <div class="compact-actions">
+                    ${week.phase === 'complete' ? `
+                      <a href="/results/${week.date}" class="btn btn-success btn-small">View Results</a>
+                    ` : week.phase === 'planning' ? `
+                      <div class="week-actions" data-week-id="${week.id}" data-week-date="${week.date}" data-week-phase="${week.phase}">
+                        <!-- Actions populated by JavaScript -->
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            }
+          });
+        });
+      });
+    });
+  });
+});
+
+// STATISTICS PAGE (placeholder for now)
+app.get('/statistics', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Statistics - Film Club</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="stylesheet" href="/styles/main.css">
+    </head>
+    <body>
+      <div class="container">
+        <div class="card">
+          <h1>📊 Statistics</h1>
+          <p>Statistics and awards features coming soon!</p>
+          <p>This will show member voting patterns, popular genres, and end-of-year awards.</p>
+          <br>
+          <a href="/" class="btn">Back to Calendar</a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`🎬 Film Club app running on port ${port}`);
+  console.log(`Visit http://localhost:${port} to get started!`);
+});
