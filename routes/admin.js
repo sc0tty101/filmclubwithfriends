@@ -184,7 +184,7 @@ router.post('/admin/import-genres', (req, res) => {
             <html>
             <head>
               <title>Import Complete - Film Club</title>
-              <link rel="stylesheet" href="/styles.css">
+              <link rel="stylesheet" href="/styles/main.css">
             </head>
             <body>
               <div class="container">
