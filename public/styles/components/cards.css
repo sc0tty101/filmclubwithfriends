@@ -1,0 +1,122 @@
+/* ==========================================================================
+   CARD COMPONENTS
+   ========================================================================== */
+
+.card {
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--gray-200);
+}
+
+.week-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.week-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--gray-300);
+}
+
+.week-info {
+  flex: 1;
+}
+
+.week-info h3 {
+  margin: 0 0 var(--space-3) 0;
+  color: var(--gray-900);
+}
+
+.genre-info {
+  margin-bottom: var(--space-4);
+  font-size: 0.875rem;
+}
+
+.genre-creator {
+  color: var(--gray-500);
+  font-size: 0.75rem;
+  margin-left: var(--space-2);
+}
+
+.week-status {
+  margin-top: var(--space-3);
+}
+
+.status-text {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Compact Week Layout */
+.compact-weeks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.week-card.compact {
+  padding: var(--space-4);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  min-height: unset;
+}
+
+.compact-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.compact-header h4 {
+  margin: 0;
+  color: var(--gray-900);
+  font-size: 1rem;
+}
+
+.compact-content {
+  flex: 1;
+}
+
+.genre-line,
+.winner-line {
+  margin: var(--space-2) 0;
+  font-size: 0.875rem;
+  color: var(--gray-600);
+}
+
+.winner-line {
+  padding: var(--space-3);
+  background: var(--winner-gradient);
+  border-radius: var(--radius-md);
+  border-left: 3px solid #f59e0b;
+  color: var(--gray-800);
+}
+
+.nominator {
+  color: var(--gray-500);
+  font-size: 0.75rem;
+}
+
+.compact-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
