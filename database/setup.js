@@ -18,7 +18,7 @@ db.serialize(() => {
     winner_score INTEGER
   )`);
 
-  // Nominations table - stores film nominations
+  // Enhanced Nominations table - stores film nominations with full TMDB data
   db.run(`CREATE TABLE IF NOT EXISTS nominations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     week_id INTEGER,
