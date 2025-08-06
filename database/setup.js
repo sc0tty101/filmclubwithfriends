@@ -1,13 +1,16 @@
 // database/setup.js
 const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+
+// Database path configuration
+const dbPath = process.env.DB_PATH || (process.env.NODE_ENV === 'production' ? '/data/filmclub.db' : './filmclub.db');
 
 // Initialize SQLite database
-const db = new sqlite3.Database('/data/filmclub.db');
+const db = new sqlite3.Database(dbPath);
 
-// Create tables when module is loaded
-db.serialize(() => {
-  // Weeks table - stores each week's info
-  db.run(`CREATE TABLE IF NOT EXISTS weeks (
+// Centralized schema definition
+const SCHEMA = {
+  weeks: `CREATE TABLE IF NOT EXISTS weeks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     week_date TEXT NOT NULL,
     genre TEXT,
@@ -17,10 +20,9 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     winner_film_id INTEGER,
     winner_score INTEGER
-  )`);
-
-  // Enhanced Nominations table - stores film nominations with full TMDB data
-  db.run(`CREATE TABLE IF NOT EXISTS nominations (
+  )`,
+  
+  nominations: `CREATE TABLE IF NOT EXISTS nominations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     week_id INTEGER,
     user_name TEXT,
@@ -37,35 +39,67 @@ db.serialize(() => {
     tmdb_genres TEXT,
     nominated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (week_id) REFERENCES weeks(id)
-  )`);
-
-  // Votes table - stores voting data
-  db.run(`CREATE TABLE IF NOT EXISTS votes (
+  )`,
+  
+  votes: `CREATE TABLE IF NOT EXISTS votes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     week_id INTEGER,
     user_name TEXT,
     votes_json TEXT,
     voted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (week_id) REFERENCES weeks(id)
-  )`);
-
-  // Members table - stores club members
-  db.run(`CREATE TABLE IF NOT EXISTS members (
+  )`,
+  
+  members: `CREATE TABLE IF NOT EXISTS members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active INTEGER DEFAULT 1,
     is_admin INTEGER DEFAULT 0
-  )`);
-
-  // Genres table - stores available genres
-  db.run(`CREATE TABLE IF NOT EXISTS genres (
+  )`,
+  
+  genres: `CREATE TABLE IF NOT EXISTS genres (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
     added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_active INTEGER DEFAULT 1
-  )`);
-});
+  )`
+};
+
+// Function to create all tables - can be called from anywhere
+function createAllTables(database, callback) {
+  database.serialize(() => {
+    // Create each table in order
+    database.run(SCHEMA.weeks, (err) => {
+      if (err) console.error('Error creating weeks table:', err);
+    });
+    
+    database.run(SCHEMA.nominations, (err) => {
+      if (err) console.error('Error creating nominations table:', err);
+    });
+    
+    database.run(SCHEMA.votes, (err) => {
+      if (err) console.error('Error creating votes table:', err);
+    });
+    
+    database.run(SCHEMA.members, (err) => {
+      if (err) console.error('Error creating members table:', err);
+    });
+    
+    database.run(SCHEMA.genres, (err) => {
+      if (err) {
+        console.error('Error creating genres table:', err);
+        if (callback) callback(err);
+      } else {
+        console.log('All tables created successfully');
+        if (callback) callback(null);
+      }
+    });
+  });
+}
+
+// Create tables on module load
+createAllTables(db);
 
 // Helper functions
 function getMembers(callback) {
@@ -76,7 +110,10 @@ function getGenres(callback) {
   db.all("SELECT name FROM genres WHERE is_active = 1 ORDER BY name", callback);
 }
 
-// Export database instance and helper functions
+// Export everything needed
 module.exports = db;
 module.exports.getMembers = getMembers;
 module.exports.getGenres = getGenres;
+module.exports.createAllTables = createAllTables;
+module.exports.SCHEMA = SCHEMA;
+module.exports.dbPath = dbPath;
