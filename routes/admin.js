@@ -1,6 +1,9 @@
+// routes/admin.js
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
+const sqlite3 = require('sqlite3').verbose();
+const { createAllTables, dbPath } = require('../database/setup');
 
 // Main admin page with all admin functions
 router.get('/admin/import-genres', (req, res) => {
@@ -105,6 +108,7 @@ Adventures
               <p>This will completely wipe all data and recreate the database with the latest schema. 
                  Useful for applying schema changes during development.</p>
               <p><strong>⚠️ This will delete:</strong> All weeks, nominations, votes, members, and genres!</p>
+              <p><small><strong>Database location:</strong> ${dbPath}</small></p>
               
               <form action="/admin/reset-database" method="POST" onsubmit="return confirm('Are you absolutely sure? This will delete ALL data and cannot be undone!')">
                 <button type="submit" class="btn btn-danger">🗑️ Reset Database</button>
@@ -302,12 +306,10 @@ router.post('/admin/toggle-admin', (req, res) => {
   );
 });
 
-// Handle database reset
+// Handle database reset - NOW USES CENTRALIZED SCHEMA
 router.post('/admin/reset-database', (req, res) => {
-  const sqlite3 = require('sqlite3').verbose();
-  const databasePath = '/data/filmclub.db';
-  
   console.log('Starting database reset...');
+  console.log('Database path:', dbPath);
   
   // Close current database connection
   req.db.close((closeErr) => {
@@ -317,99 +319,72 @@ router.post('/admin/reset-database', (req, res) => {
     
     // Delete the database file
     try {
-      if (fs.existsSync(databasePath)) {
-        fs.unlinkSync(databasePath);
+      if (fs.existsSync(dbPath)) {
+        fs.unlinkSync(dbPath);
         console.log('Old database deleted');
       }
       
       // Create new database with fresh schema
-      const newDb = new sqlite3.Database(databasePath);
+      const newDb = new sqlite3.Database(dbPath);
       
-      newDb.serialize(() => {
-        // Recreate all tables with latest schema
-        newDb.run(`CREATE TABLE weeks (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          week_date TEXT NOT NULL,
-          genre TEXT,
-          genre_source TEXT,
-          phase TEXT DEFAULT 'planning',
-          created_by TEXT,
-          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          winner_film_id INTEGER,
-          winner_score INTEGER
-        )`);
-
-        newDb.run(`CREATE TABLE nominations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          week_id INTEGER,
-          user_name TEXT,
-          film_title TEXT,
-          film_year INTEGER,
-          poster_url TEXT,
-          tmdb_id INTEGER,
-          nominated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (week_id) REFERENCES weeks(id)
-        )`);
-
-        newDb.run(`CREATE TABLE votes (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          week_id INTEGER,
-          user_name TEXT,
-          votes_json TEXT,
-          voted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (week_id) REFERENCES weeks(id)
-        )`);
-
-        newDb.run(`CREATE TABLE members (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT UNIQUE NOT NULL,
-          added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          is_active INTEGER DEFAULT 1,
-          is_admin INTEGER DEFAULT 0
-        )`);
-
-        newDb.run(`CREATE TABLE genres (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT UNIQUE NOT NULL,
-          added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          is_active INTEGER DEFAULT 1
-        )`, (err) => {
-          if (err) {
-            console.error('Error creating tables:', err);
-            return res.status(500).send('Error recreating database');
-          }
-          
-          console.log('Database reset complete - new schema created');
-          
-          // Close the new database connection
+      // Use the centralized createAllTables function
+      createAllTables(newDb, (err) => {
+        if (err) {
+          console.error('Error creating tables:', err);
           newDb.close();
-          
-          // Send success response
-          res.send(`
+          return res.status(500).send(`
             <!DOCTYPE html>
             <html>
             <head>
-              <title>Database Reset Complete - Film Club</title>
+              <title>Reset Error - Film Club</title>
               <link rel="stylesheet" href="/styles/main.css">
             </head>
             <body>
               <div class="container">
                 <div class="card">
-                  <h1>✅ Database Reset Complete!</h1>
-                  <p>The database has been successfully reset with the latest schema.</p>
-                  <p><strong>Fresh start:</strong> All tables have been recreated and are ready to use.</p>
-                  
+                  <h1>❌ Reset Failed</h1>
+                  <p>Error creating tables: ${err.message}</p>
                   <div class="actions">
-                    <a href="/admin/import-genres" class="btn btn-primary">Back to Admin</a>
-                    <a href="/manage-genres" class="btn btn-secondary">Add Genres</a>
-                    <a href="/" class="btn btn-success">Back to Calendar</a>
+                    <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
                   </div>
                 </div>
               </div>
             </body>
             </html>
           `);
-        });
+        }
+        
+        console.log('Database reset complete - new schema created');
+        
+        // Close the new database connection
+        newDb.close();
+        
+        // Send success response
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Database Reset Complete - Film Club</title>
+            <link rel="stylesheet" href="/styles/main.css">
+          </head>
+          <body>
+            <div class="container">
+              <div class="card">
+                <h1>✅ Database Reset Complete!</h1>
+                <p>The database has been successfully reset with the latest schema.</p>
+                <p><strong>Fresh start:</strong> All tables have been recreated and are ready to use.</p>
+                <p><small><strong>Database location:</strong> ${dbPath}</small></p>
+                
+                <div class="actions">
+                  <a href="/admin/import-genres" class="btn btn-primary">Back to Admin</a>
+                  <a href="/manage-genres" class="btn btn-secondary">Add Genres</a>
+                  <a href="/" class="btn btn-success">Back to Calendar</a>
+                </div>
+              </div>
+            </div>
+          </body>
+          </html>
+        `);
       });
       
     } catch (err) {
