@@ -19,7 +19,7 @@ router.get('/set-genre/:date', (req, res) => {
       <head>
         <title>Set Genre - Film Club</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="/styles.css">
+        <link rel="stylesheet" href="/styles/main.css">
       </head>
       <body>
         <div class="container">
