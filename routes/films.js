@@ -214,21 +214,75 @@ router.get('/nominate/:date', (req, res) => {
               \`).join('');
             }
             
-            function selectFilm(id, title, year, posterPath) {
-              document.getElementById('selectedFilmId').value = id;
-              document.getElementById('selectedFilmTitle').value = title;
-              document.getElementById('selectedFilmYear').value = year;
-              document.getElementById('selectedPosterUrl').value = posterPath;
-              
-              document.getElementById('selectedFilm').innerHTML = \`
-                <h3>Selected Film:</h3>
-                <div class="selected-film-display">
-                  \${posterPath ? \`<img src="https://image.tmdb.org/t/p/w154\${posterPath}" alt="\${title}" class="selected-poster">\` : '<div class="selected-poster-placeholder">No Image</div>'}
-                  <div class="selected-details">
-                    <h4>\${title} (\${year})</h4>
-                  </div>
-                </div>
-              \`;
+function selectFilm(id, title, year, posterPath) {
+  // Show loading state
+  document.getElementById('searchResults').innerHTML = '<p>Loading film details...</p>';
+  
+  // Fetch full movie details from TMDB
+  fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${process.env.TMDB_API_KEY}&append_to_response=credits`)
+    .then(response => response.json())
+    .then(film => {
+      // Extract director from credits
+      const director = film.credits?.crew?.find(person => person.job === 'Director')?.name || 'Unknown';
+      
+      // Extract genres
+      const genres = film.genres?.map(g => g.name).join(', ') || '';
+      
+      // Store all the data
+      document.getElementById('selectedFilmId').value = id;
+      document.getElementById('selectedFilmTitle').value = title;
+      document.getElementById('selectedFilmYear').value = year;
+      document.getElementById('selectedPosterUrl').value = posterPath;
+      document.getElementById('selectedBackdropUrl').value = film.backdrop_path || '';
+      document.getElementById('selectedVoteAverage').value = film.vote_average || 0;
+      document.getElementById('selectedReleaseDate').value = film.release_date || '';
+      document.getElementById('selectedRuntime').value = film.runtime || 0;
+      document.getElementById('selectedOverview').value = film.overview || '';
+      document.getElementById('selectedDirector').value = director;
+      document.getElementById('selectedGenres').value = genres;
+      
+      document.getElementById('selectedFilm').innerHTML = `
+        <h3>Selected Film:</h3>
+        <div class="selected-film-display">
+          ${posterPath ? `<img src="https://image.tmdb.org/t/p/w154${posterPath}" alt="${title}" class="selected-poster">` : '<div class="selected-poster-placeholder">No Image</div>'}
+          <div class="selected-details">
+            <h4>${title} (${year})</h4>
+            <p><strong>Director:</strong> ${director}</p>
+            <p><strong>Rating:</strong> ${film.vote_average ? film.vote_average.toFixed(1) : 'N/A'}/10</p>
+            <p><strong>Runtime:</strong> ${film.runtime ? film.runtime + ' min' : 'Unknown'}</p>
+            <p class="overview">${film.overview ? film.overview.substring(0, 200) + '...' : 'No description available.'}</p>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('nominationForm').style.display = 'block';
+      document.getElementById('searchResults').innerHTML = '';
+      document.getElementById('filmSearch').value = '';
+    })
+    .catch(error => {
+      console.error('Error fetching film details:', error);
+      // Fallback to basic selection
+      document.getElementById('selectedFilmId').value = id;
+      document.getElementById('selectedFilmTitle').value = title;
+      document.getElementById('selectedFilmYear').value = year;
+      document.getElementById('selectedPosterUrl').value = posterPath;
+      
+      document.getElementById('selectedFilm').innerHTML = `
+        <h3>Selected Film:</h3>
+        <div class="selected-film-display">
+          ${posterPath ? `<img src="https://image.tmdb.org/t/p/w154${posterPath}" alt="${title}" class="selected-poster">` : '<div class="selected-poster-placeholder">No Image</div>'}
+          <div class="selected-details">
+            <h4>${title} (${year})</h4>
+            <p><em>Basic information only - full details unavailable</em></p>
+          </div>
+        </div>
+      `;
+      
+      document.getElementById('nominationForm').style.display = 'block';
+      document.getElementById('searchResults').innerHTML = '';
+      document.getElementById('filmSearch').value = '';
+    });
+}
               
               document.getElementById('nominationForm').style.display = 'block';
               document.getElementById('searchResults').innerHTML = '';
@@ -242,14 +296,41 @@ router.get('/nominate/:date', (req, res) => {
               document.getElementById('errorMessage').style.display = 'none';
             }
             
-            function submitNomination() {
-              const formData = {
-                tmdbId: document.getElementById('selectedFilmId').value,
-                filmTitle: document.getElementById('selectedFilmTitle').value,
-                filmYear: document.getElementById('selectedFilmYear').value,
-                posterUrl: document.getElementById('selectedPosterUrl').value,
-                userName: '${currentUser}'
-              };
+function submitNomination() {
+  const formData = {
+    tmdbId: document.getElementById('selectedFilmId').value,
+    filmTitle: document.getElementById('selectedFilmTitle').value,
+    filmYear: document.getElementById('selectedFilmYear').value,
+    posterUrl: document.getElementById('selectedPosterUrl').value,
+    backdropUrl: document.getElementById('selectedBackdropUrl').value,
+    voteAverage: document.getElementById('selectedVoteAverage').value,
+    releaseDate: document.getElementById('selectedReleaseDate').value,
+    runtime: document.getElementById('selectedRuntime').value,
+    overview: document.getElementById('selectedOverview').value,
+    director: document.getElementById('selectedDirector').value,
+    tmdbGenres: document.getElementById('selectedGenres').value,
+    userName: '${currentUser}'
+  };
+  
+  fetch('/nominate/${weekDate}', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(formData)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      window.location.reload();
+    } else {
+      showError(data.error || 'Failed to nominate film');
+    }
+  })
+  .catch(error => {
+    showError('Network error. Please try again.');
+  });
+}
               
               fetch('/nominate/${weekDate}', {
                 method: 'POST',
