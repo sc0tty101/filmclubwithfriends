@@ -390,7 +390,7 @@ router.post('/admin/reset-database', (req, res) => {
             <html>
             <head>
               <title>Database Reset Complete - Film Club</title>
-              <link rel="stylesheet" href="/styles.css">
+              <link rel="stylesheet" href="/styles/main.css">
             </head>
             <body>
               <div class="container">
@@ -419,7 +419,7 @@ router.post('/admin/reset-database', (req, res) => {
         <html>
         <head>
           <title>Reset Error - Film Club</title>
-          <link rel="stylesheet" href="/styles.css">
+          <link rel="stylesheet" href="/styles/main.css">
         </head>
         <body>
           <div class="container">
