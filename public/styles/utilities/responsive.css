@@ -1,0 +1,142 @@
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  body {
+    padding: var(--space-3);
+  }
+  
+  .container {
+    max-width: 100%;
+  }
+  
+  /* Navigation */
+  .user-select {
+    position: static;
+    margin-bottom: var(--space-5);
+    text-align: center;
+  }
+  
+  .nav-buttons {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  /* Cards */
+  .week-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+  }
+  
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .compact-weeks {
+    grid-template-columns: 1fr;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  
+  .compact-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+  
+  .compact-actions {
+    justify-content: center;
+  }
+  
+  /* Progress Indicators */
+  .progress-indicator {
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+  
+  .step-icon {
+    width: 2rem;
+    height: 2rem;
+    font-size: 1rem;
+  }
+  
+  .step-label {
+    font-size: 0.625rem;
+  }
+  
+  .progress-step:not(:last-child)::after {
+    width: 2rem;
+    right: -1rem;
+  }
+  
+  /* Admin & Management */
+  .genre-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .genre-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  
+  .member-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+  
+  .member-controls {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  /* Results Page */
+  .stats-summary {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .winner-display {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .winner-stats {
+    justify-content: center;
+  }
+  
+  .result-header {
+    flex-direction: column;
+    text-align: center;
+    gap: var(--space-4);
+  }
+  
+  .result-score {
+    margin-left: 0;
+  }
+  
+  .votes-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .vote-detail {
+    flex-direction: column;
+    gap: var(--space-1);
+    text-align: center;
+  }
+  
+  .summary-stat {
+    flex-direction: column;
+    gap: var(--space-1);
+    text-align: center;
+  }
+}
