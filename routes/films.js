@@ -38,7 +38,7 @@ router.get('/nominate/:date', (req, res) => {
           <head>
             <title>Nominate Film - Film Club</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <link rel="stylesheet" href="/styles.css">
+            <link rel="stylesheet" href="/styles/main.css">
           </head>
           <body>
             <div class="container">
