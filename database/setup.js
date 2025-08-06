@@ -26,7 +26,14 @@ db.serialize(() => {
     film_title TEXT,
     film_year INTEGER,
     poster_url TEXT,
+    backdrop_url TEXT,
     tmdb_id INTEGER,
+    vote_average REAL,
+    release_date TEXT,
+    runtime INTEGER,
+    overview TEXT,
+    director TEXT,
+    tmdb_genres TEXT,
     nominated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (week_id) REFERENCES weeks(id)
   )`);
