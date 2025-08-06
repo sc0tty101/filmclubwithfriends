@@ -1,0 +1,123 @@
+
+/* ==========================================================================
+   PROGRESS INDICATORS & BADGES
+   ========================================================================== */
+
+/* Phase Badges */
+.phase-badge {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.phase-planning {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.phase-genre {
+  background: #fed7aa;
+  color: #c2410c;
+}
+
+.phase-nomination {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.phase-voting {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.phase-complete {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+/* Progress Indicators */
+.progress-indicator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-6) 0;
+  padding: var(--space-4);
+  background: var(--gray-50);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+}
+
+.progress-indicator.large {
+  padding: var(--space-6);
+  margin: var(--space-8) 0;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  position: relative;
+  opacity: 0.4;
+  transition: all 0.3s ease;
+}
+
+.progress-step.active {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.progress-step.completed {
+  opacity: 0.8;
+  color: var(--success-color);
+}
+
+.step-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-full);
+  background: var(--gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  transition: all 0.3s ease;
+}
+
+.progress-step.active .step-icon {
+  background: var(--primary-color);
+  color: var(--white);
+  box-shadow: 0 0 20px rgb(37 99 235 / 0.3);
+}
+
+.progress-step.completed .step-icon {
+  background: var(--success-color);
+  color: var(--white);
+}
+
+.step-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Progress connecting lines */
+.progress-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 1.25rem;
+  right: -2rem;
+  width: 4rem;
+  height: 2px;
+  background: var(--gray-200);
+  z-index: -1;
+}
+
+.progress-step.completed:not(:last-child)::after {
+  background: var(--success-color);
+}
