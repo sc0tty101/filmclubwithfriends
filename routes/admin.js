@@ -125,6 +125,33 @@ Adventures
           <div class="card">
             <h2>🗃️ Database Management</h2>
             <p><strong>⚠️ Development Tools - Use with caution!</strong></p>
+
+                     <!-- Table View Section -->
+          <div class="card">
+            <h2>📊 Data Views</h2>
+            <p>Alternative views for your film club data</p>
+            
+            <div style="margin: 20px 0;">
+              <p><strong>Table View Features:</strong></p>
+              <ul style="margin: 10px 0; padding-left: 25px;">
+                <li>See all weeks in a condensed table</li>
+                <li>Filter by phase, genre, winner, or year</li>
+                <li>Sort by any column</li>
+                <li>Export to CSV for spreadsheets</li>
+                <li>Color-coded week status</li>
+                <li>Quick access to actions for each week</li>
+              </ul>
+            </div>
+            
+            <div class="actions">
+              <a href="/admin/table-view" class="btn btn-primary">
+                📊 Open Table View
+              </a>
+              <a href="/" class="btn btn-secondary">
+                📅 Calendar View
+              </a>
+            </div>
+          </div>
             
             <div style="margin-bottom: 20px;">
               <h3>Reset Database</h3>
