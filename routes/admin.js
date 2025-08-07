@@ -98,6 +98,29 @@ Adventures
             </form>
           </div>
 
+          <!-- Historical Data Import Section -->
+          <div class="card">
+            <h2>📊 Import Historical Data</h2>
+            <p>Import your film club history from spreadsheet data (weeks, nominations, winners)</p>
+            
+            <div style="margin: 20px 0;">
+              <p><strong>This tool will:</strong></p>
+              <ul style="margin: 10px 0; padding-left: 25px;">
+                <li>Parse your spreadsheet data automatically</li>
+                <li>Create weeks and nominations</li>
+                <li>Mark winners based on vote scores</li>
+                <li>Create any missing members</li>
+                <li>Skip problematic weeks (5a/5b, etc.)</li>
+              </ul>
+            </div>
+            
+            <div class="actions">
+              <a href="/admin/import-historical" class="btn btn-primary btn-large">
+                📥 Import Historical Data
+              </a>
+            </div>
+          </div>
+
           <!-- Database Management Section -->
           <div class="card">
             <h2>🗃️ Database Management</h2>
