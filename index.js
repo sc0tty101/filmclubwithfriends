@@ -22,15 +22,15 @@ const tableViewRoutes = require('./routes/table-view');
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
-app.use('/', tableViewRoutes);
 
-// Make database available to all routes
+// 🔧 FIX: Make database available to all routes FIRST
 app.use((req, res, next) => {
   req.db = db;
   next();
 });
 
-// Use route modules
+// 🔧 FIX: Now all routes (including table-view) have access to req.db
+app.use('/', tableViewRoutes);
 app.use('/', membersRoutes);
 app.use('/', genresRoutes);
 app.use('/', weeksRoutes);
@@ -238,6 +238,7 @@ app.get('/', (req, res) => {
                   <div class="nav-buttons">
                     <a href="/manage-genres">🎭 Manage Genres</a>
                     <a href="/statistics">📊 Statistics</a>
+                    <a href="/admin/table-view">📋 Table View</a>
                     <a href="/admin/import-genres" id="adminLink" style="display: none;">🔧 Admin</a>
                   </div>
 
@@ -363,29 +364,29 @@ app.get('/', (req, res) => {
                     let actions = '';
                     
                     if (weekPhase === 'planning') {
-                      actions += \`<a href="/set-genre/\${weekDate}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/\${weekDate}')">Set Genre</a>\`;
+                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${weekDate}')">Set Genre</a>`;
                     } else if (weekPhase === 'genre') {
-                      actions += \`<a href="/random-genre/\${weekDate}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/\${weekDate}')">Random Genre</a>\`;
+                      actions += `<a href="/random-genre/${weekDate}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${weekDate}')">Random Genre</a>`;
                     } else if (weekPhase === 'nomination') {
                       const userNominated = userNominations.some(nom => nom.week_id === weekId);
                       
                       if (userNominated) {
-                        actions += \`<a href="/nominate/\${weekDate}" class="btn btn-success btn-outline" onclick="checkUserAndGoWithUser('/nominate/\${weekDate}'); return false;">✓ Edit Nomination</a>\`;
+                        actions += `<a href="/nominate/${weekDate}" class="btn btn-success btn-outline" onclick="checkUserAndGoWithUser('/nominate/${weekDate}'); return false;">✓ Edit Nomination</a>`;
                       } else {
-                        actions += \`<a href="/nominate/\${weekDate}" class="btn btn-success" onclick="checkUserAndGoWithUser('/nominate/\${weekDate}'); return false;">Nominate Film</a>\`;
+                        actions += `<a href="/nominate/${weekDate}" class="btn btn-success" onclick="checkUserAndGoWithUser('/nominate/${weekDate}'); return false;">Nominate Film</a>`;
                       }
-                      actions += \`<a href="/set-genre/\${weekDate}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/\${weekDate}')">Change Genre</a>\`;
+                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${weekDate}')">Change Genre</a>`;
                     } else if (weekPhase === 'voting') {
                       const userVoted = userVotes.some(vote => vote.week_id === weekId);
                       
                       if (userVoted) {
-                        actions += \`<a href="/vote/\${weekDate}" class="btn btn-warning btn-outline" onclick="checkUserAndGoWithUser('/vote/\${weekDate}'); return false;">✓ View Your Vote</a>\`;
+                        actions += `<a href="/vote/${weekDate}" class="btn btn-warning btn-outline" onclick="checkUserAndGoWithUser('/vote/${weekDate}'); return false;">✓ View Your Vote</a>`;
                       } else {
-                        actions += \`<a href="/vote/\${weekDate}" class="btn btn-warning" onclick="checkUserAndGoWithUser('/vote/\${weekDate}'); return false;">Vote</a>\`;
+                        actions += `<a href="/vote/${weekDate}" class="btn btn-warning" onclick="checkUserAndGoWithUser('/vote/${weekDate}'); return false;">Vote</a>`;
                       }
-                      actions += \`<a href="/set-genre/\${weekDate}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/\${weekDate}')">Change Genre</a>\`;
+                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${weekDate}')">Change Genre</a>`;
                     } else if (weekPhase === 'complete') {
-                      actions += \`<a href="/results/\${weekDate}" class="btn btn-success">View Results</a>\`;
+                      actions += `<a href="/results/${weekDate}" class="btn btn-success">View Results</a>`;
                     }
                     
                     actionsDiv.innerHTML = actions;
@@ -403,7 +404,7 @@ app.get('/', (req, res) => {
                   const weekId = currentWeekElement.id.split('-')[1];
                   
                   // Fetch current week films with enhanced data
-                  fetch(\`/api/week/\${weekId}/films\`)
+                  fetch(`/api/week/${weekId}/films`)
                     .then(response => response.json())
                     .then(data => {
                       if (data.films && data.films.length > 0) {
@@ -422,93 +423,93 @@ app.get('/', (req, res) => {
                     return renderFilmShowcase(film);
                   } else if (films.length > 1) {
                     // Multiple films - grid display
-                    return \`
+                    return `
                       <div class="current-week-grid">
-                        \${films.map(film => renderFilmCardCompact(film)).join('')}
+                        ${films.map(film => renderFilmCardCompact(film)).join('')}
                       </div>
-                    \`;
+                    `;
                   }
                   return '';
                 }
 
                 function renderFilmShowcase(film) {
-                  const backdropUrl = film.backdrop_url ? \`https://image.tmdb.org/t/p/w1280\${film.backdrop_url}\` : '';
-                  const posterUrl = film.poster_url ? \`https://image.tmdb.org/t/p/w500\${film.poster_url}\` : '';
+                  const backdropUrl = film.backdrop_url ? `https://image.tmdb.org/t/p/w1280${film.backdrop_url}` : '';
+                  const posterUrl = film.poster_url ? `https://image.tmdb.org/t/p/w500${film.poster_url}` : '';
                   const rating = film.vote_average ? parseFloat(film.vote_average).toFixed(1) : 'N/A';
-                  const runtime = film.runtime ? \`\${film.runtime} min\` : '';
+                  const runtime = film.runtime ? `${film.runtime} min` : '';
                   const releaseDate = film.release_date ? new Date(film.release_date).getFullYear() : '';
                   
-                  return \`
+                  return `
                     <div class="film-showcase">
-                      \${backdropUrl ? \`<img src="\${backdropUrl}" alt="\${film.film_title}" class="film-backdrop">\` : ''}
+                      ${backdropUrl ? `<img src="${backdropUrl}" alt="${film.film_title}" class="film-backdrop">` : ''}
                       <div class="film-backdrop-overlay"></div>
                       
                       <div class="film-content">
-                        \${posterUrl ? \`<img src="\${posterUrl}" alt="\${film.film_title}" class="film-poster-large">\` : ''}
+                        ${posterUrl ? `<img src="${posterUrl}" alt="${film.film_title}" class="film-poster-large">` : ''}
                         
                         <div class="film-details-large">
                           <h2 class="film-title-large">
-                            \${film.film_title} 
-                            <span class="film-year-large">(\${film.film_year})</span>
+                            ${film.film_title} 
+                            <span class="film-year-large">(${film.film_year})</span>
                           </h2>
                           
                           <div class="film-meta-large">
-                            \${rating !== 'N/A' ? \`<div class="film-rating">\${rating}</div>\` : ''}
-                            \${releaseDate ? \`<span class="film-meta-item">\${releaseDate}</span>\` : ''}
-                            \${film.tmdb_genres ? \`<span class="film-meta-item">\${film.tmdb_genres}</span>\` : ''}
-                            \${runtime ? \`<span class="film-meta-item">\${runtime}</span>\` : ''}
+                            ${rating !== 'N/A' ? `<div class="film-rating">${rating}</div>` : ''}
+                            ${releaseDate ? `<span class="film-meta-item">${releaseDate}</span>` : ''}
+                            ${film.tmdb_genres ? `<span class="film-meta-item">${film.tmdb_genres}</span>` : ''}
+                            ${runtime ? `<span class="film-meta-item">${runtime}</span>` : ''}
                           </div>
                           
-                          \${film.overview ? \`
+                          ${film.overview ? `
                             <div class="film-overview-large">
-                              \${film.overview}
+                              ${film.overview}
                             </div>
-                          \` : ''}
+                          ` : ''}
                           
                           <div class="film-credits">
-                            \${film.director ? \`
+                            ${film.director ? `
                               <div class="film-director">
-                                <strong>Director:</strong> \${film.director}
+                                <strong>Director:</strong> ${film.director}
                               </div>
-                            \` : ''}
+                            ` : ''}
                             <div class="film-nominator">
-                              <strong>Nominated by:</strong> \${film.user_name}
+                              <strong>Nominated by:</strong> ${film.user_name}
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  \`;
+                  `;
                 }
 
                 function renderFilmCardCompact(film) {
-                  const backdropUrl = film.backdrop_url ? \`https://image.tmdb.org/t/p/w500\${film.backdrop_url}\` : '';
-                  const posterUrl = film.poster_url ? \`https://image.tmdb.org/t/p/w200\${film.poster_url}\` : '';
+                  const backdropUrl = film.backdrop_url ? `https://image.tmdb.org/t/p/w500${film.backdrop_url}` : '';
+                  const posterUrl = film.poster_url ? `https://image.tmdb.org/t/p/w200${film.poster_url}` : '';
                   const rating = film.vote_average ? parseFloat(film.vote_average).toFixed(1) : 'N/A';
                   const releaseDate = film.release_date ? new Date(film.release_date).getFullYear() : '';
                   
-                  return \`
+                  return `
                     <div class="film-card-compact">
                       <div class="film-card-backdrop">
-                        \${backdropUrl ? \`<img src="\${backdropUrl}" alt="\${film.film_title}">\` : ''}
-                        \${posterUrl ? \`<img src="\${posterUrl}" alt="\${film.film_title}" class="film-card-poster">\` : ''}
+                        ${backdropUrl ? `<img src="${backdropUrl}" alt="${film.film_title}">` : ''}
+                        ${posterUrl ? `<img src="${posterUrl}" alt="${film.film_title}" class="film-card-poster">` : ''}
                       </div>
                       
                       <div class="film-card-content">
-                        <h4 class="film-card-title">\${film.film_title} (\${film.film_year})</h4>
+                        <h4 class="film-card-title">${film.film_title} (${film.film_year})</h4>
                         
                         <div class="film-card-meta">
-                          \${rating !== 'N/A' ? \`<span class="film-card-rating">⭐ \${rating}</span>\` : ''}
-                          \${releaseDate ? \`<span>\${releaseDate}</span>\` : ''}
-                          \${film.runtime ? \`<span>\${film.runtime} min</span>\` : ''}
+                          ${rating !== 'N/A' ? `<span class="film-card-rating">⭐ ${rating}</span>` : ''}
+                          ${releaseDate ? `<span>${releaseDate}</span>` : ''}
+                          ${film.runtime ? `<span>${film.runtime} min</span>` : ''}
                         </div>
                         
                         <div class="film-card-nominator">
-                          Nominated by \${film.user_name}
+                          Nominated by ${film.user_name}
                         </div>
                       </div>
                     </div>
-                  \`;
+                  `;
                 }
 
                 window.onload = function() {
