@@ -1,72 +1,108 @@
-// routes/table-view.js
+});
+      });
+    });// routes/table-view.js
 const express = require('express');
 const router = express.Router();
 
 // Table view page
 router.get('/admin/table-view', (req, res) => {
-  // Get all weeks with their data
-  const query = `
+  // Get all weeks first
+  req.db.all(`
     SELECT 
-      w.id,
-      w.week_date,
-      w.genre,
-      w.genre_source,
-      w.phase,
-      w.created_by,
-      w.winner_score,
-      wn.film_title as winner_title,
-      wn.film_year as winner_year,
-      wn.user_name as winner_nominator,
-      COUNT(DISTINCT n.id) as nomination_count,
-      COUNT(DISTINCT v.id) as vote_count,
-      GROUP_CONCAT(DISTINCT n.user_name) as nominators
+      w.*,
+      n.film_title as winner_title,
+      n.film_year as winner_year,
+      n.user_name as winner_nominator
     FROM weeks w
-    LEFT JOIN nominations wn ON w.winner_film_id = wn.id
-    LEFT JOIN nominations n ON w.id = n.week_id
-    LEFT JOIN votes v ON w.id = v.week_id
-    GROUP BY w.id
+    LEFT JOIN nominations n ON w.winner_film_id = n.id
     ORDER BY w.week_date DESC
-  `;
-  
-  req.db.all(query, (err, weeks) => {
+  `, (err, weeks) => {
     if (err) {
       console.error('Error fetching weeks:', err);
-      return res.status(500).send('Database error');
+      return res.status(500).send('Database error: ' + err.message);
     }
     
-    // Get all members for the filter dropdown
-    req.db.all("SELECT DISTINCT name FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
+    // Get counts for each week separately
+    req.db.all(`
+      SELECT 
+        w.id as week_id,
+        COUNT(DISTINCT n.id) as nomination_count,
+        COUNT(DISTINCT v.id) as vote_count
+      FROM weeks w
+      LEFT JOIN nominations n ON w.id = n.week_id
+      LEFT JOIN votes v ON w.id = v.week_id
+      GROUP BY w.id
+    `, (err, counts) => {
       if (err) {
-        console.error('Error fetching members:', err);
-        members = [];
+        console.error('Error fetching counts:', err);
+        counts = [];
       }
       
-      // Process weeks data
-      weeks = weeks.map(week => {
-        const weekDate = new Date(week.week_date);
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        weekDate.setHours(0, 0, 0, 0);
+      // Get nominators for each week
+      req.db.all(`
+        SELECT 
+          week_id,
+          GROUP_CONCAT(DISTINCT user_name) as nominators
+        FROM nominations
+        GROUP BY week_id
+      `, (err, nominatorData) => {
+        if (err) {
+          console.error('Error fetching nominators:', err);
+          nominatorData = [];
+        }
         
-        // Determine if past, current, or future
-        const daysDiff = Math.floor((weekDate - today) / (1000 * 60 * 60 * 24));
-        let weekStatus = 'future';
-        if (daysDiff < -7) weekStatus = 'past';
-        else if (daysDiff >= -7 && daysDiff < 0) weekStatus = 'recent';
-        else if (daysDiff >= 0 && daysDiff < 7) weekStatus = 'current';
-        else if (daysDiff >= 7 && daysDiff < 28) weekStatus = 'upcoming';
+        // Create lookup objects
+        const countsLookup = {};
+        counts.forEach(c => {
+          countsLookup[c.week_id] = {
+            nomination_count: c.nomination_count,
+            vote_count: c.vote_count
+          };
+        });
         
-        return {
-          ...week,
-          weekStatus,
-          displayDate: weekDate.toLocaleDateString('en-US', { 
-            month: 'short', 
-            day: 'numeric',
-            year: 'numeric'
-          }),
-          nominatorsList: week.nominators ? week.nominators.split(',') : []
-        };
-      });
+        const nominatorsLookup = {};
+        nominatorData.forEach(n => {
+          nominatorsLookup[n.week_id] = n.nominators;
+        });
+    
+        // Get all members for the filter dropdown
+        req.db.all("SELECT DISTINCT name FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
+          if (err) {
+            console.error('Error fetching members:', err);
+            members = [];
+          }
+          
+          // Process and merge weeks data
+          weeks = weeks.map(week => {
+            const weekDate = new Date(week.week_date);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            weekDate.setHours(0, 0, 0, 0);
+            
+            // Determine if past, current, or future
+            const daysDiff = Math.floor((weekDate - today) / (1000 * 60 * 60 * 24));
+            let weekStatus = 'future';
+            if (daysDiff < -7) weekStatus = 'past';
+            else if (daysDiff >= -7 && daysDiff < 0) weekStatus = 'recent';
+            else if (daysDiff >= 0 && daysDiff < 7) weekStatus = 'current';
+            else if (daysDiff >= 7 && daysDiff < 28) weekStatus = 'upcoming';
+            
+            const weekCounts = countsLookup[week.id] || { nomination_count: 0, vote_count: 0 };
+            const nominators = nominatorsLookup[week.id] || '';
+            
+            return {
+              ...week,
+              ...weekCounts,
+              nominators,
+              weekStatus,
+              displayDate: weekDate.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                year: 'numeric'
+              }),
+              nominatorsList: nominators ? nominators.split(',') : []
+            };
+          });
       
       res.send(`
         <!DOCTYPE html>
