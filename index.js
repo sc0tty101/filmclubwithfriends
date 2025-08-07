@@ -16,11 +16,13 @@ const votesRoutes = require('./routes/votes');
 const resultsRoutes = require('./routes/results');
 const statisticsRoutes = require('./routes/statistics');
 const importRoutes = require('./routes/import');
+const tableViewRoutes = require('./routes/table-view');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(express.static('public'));
+app.use('/', tableViewRoutes);
 
 // Make database available to all routes
 app.use((req, res, next) => {
