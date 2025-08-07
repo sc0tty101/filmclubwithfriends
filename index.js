@@ -15,6 +15,7 @@ const filmsRoutes = require('./routes/films');
 const votesRoutes = require('./routes/votes');
 const resultsRoutes = require('./routes/results');
 const statisticsRoutes = require('./routes/statistics');
+const importRoutes = require('./routes/import');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
@@ -36,6 +37,7 @@ app.use('/', filmsRoutes);
 app.use('/', votesRoutes);
 app.use('/', resultsRoutes);
 app.use('/', statisticsRoutes);
+app.use('/', importRoutes);
 
 // API endpoint for current week films with enhanced data
 app.get('/api/week/:weekId/films', (req, res) => {
