@@ -1,105 +1,629 @@
-// routes/table-view.js - SIMPLE VERSION FOR BEGINNERS
 const express = require('express');
-const router = express.Router();
+const path = require('path');
+const app = express();
+const port = process.env.PORT || 3000;
 
-// Table view page - much simpler and easier to understand!
-router.get('/admin/table-view', (req, res) => {
-  console.log('📋 Table view requested'); // Debug log
+// Import database setup
+const db = require('./database/setup');
+
+// Import route modules
+const membersRoutes = require('./routes/members');
+const genresRoutes = require('./routes/genres');
+const weeksRoutes = require('./routes/weeks');
+const adminRoutes = require('./routes/admin');
+const filmsRoutes = require('./routes/films');
+const votesRoutes = require('./routes/votes');
+const resultsRoutes = require('./routes/results');
+const statisticsRoutes = require('./routes/statistics');
+const importRoutes = require('./routes/import');
+const tableViewRoutes = require('./routes/table-view');
+
+// Middleware
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.static('public'));
+
+// 🔧 FIX: Make database available to all routes FIRST
+app.use((req, res, next) => {
+  req.db = db;
+  next();
+});
+
+// 🔧 FIX: Now all routes (including table-view) have access to req.db
+app.use('/', tableViewRoutes);
+app.use('/', membersRoutes);
+app.use('/', genresRoutes);
+app.use('/', weeksRoutes);
+app.use('/', adminRoutes);
+app.use('/', filmsRoutes);
+app.use('/', votesRoutes);
+app.use('/', resultsRoutes);
+app.use('/', statisticsRoutes);
+app.use('/', importRoutes);
+
+// API endpoint for current week films with enhanced data
+app.get('/api/week/:weekId/films', (req, res) => {
+  const weekId = req.params.weekId;
   
-  // Check if database is available
-  if (!req.db) {
-    console.error('❌ Database not available in req.db');
-    return res.status(500).send(`
-      <h1>Database Error</h1>
-      <p>Database connection not available. Check your middleware setup!</p>
-      <a href="/">Back to Home</a>
-    `);
+  // Get all nominations for this week with enhanced data
+  db.all(`
+    SELECT 
+      id, user_name, film_title, film_year, poster_url, backdrop_url,
+      vote_average, release_date, runtime, overview, director, tmdb_genres,
+      nominated_at
+    FROM nominations 
+    WHERE week_id = ? 
+    ORDER BY nominated_at
+  `, [weekId], (err, films) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    res.json({ films: films || [] });
+  });
+});
+
+// Main home route with enhanced current week display
+app.get('/', (req, res) => {
+  // Helper functions
+  function getMondayOfWeek(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(d.setDate(diff));
   }
 
-  console.log('✅ Database available, fetching weeks...'); // Debug log
+  function formatDate(date) {
+    return date.toISOString().split('T')[0];
+  }
 
-  // STEP 1: Get all weeks (simple query first)
-  req.db.all("SELECT * FROM weeks ORDER BY week_date DESC", (err, weeks) => {
+  function generateWeeks() {
+    const weeks = [];
+    const currentMonday = getMondayOfWeek(new Date());
+    
+    // Generate weeks: 3 previous + current + next 48 weeks = 52 total
+    for (let i = -3; i < 49; i++) {
+      const weekDate = new Date(currentMonday);
+      weekDate.setDate(currentMonday.getDate() + (i * 7));
+      
+      const isCurrentWeek = i === 0;
+      const isPastWeek = i < 0;
+      const isNearFuture = i > 0 && i <= 3; // Next 3 weeks
+      const isFarFuture = i > 3;
+      
+      weeks.push({
+        date: formatDate(weekDate),
+        displayDate: weekDate.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        shortDate: weekDate.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric'
+        }),
+        isCurrentWeek,
+        isPastWeek,
+        isNearFuture,
+        isFarFuture,
+        weekOffset: i
+      });
+    }
+    return weeks;
+  }
+
+  const weeks = generateWeeks();
+  
+  // Get members first, then weeks
+  db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
     if (err) {
-      console.error('❌ Error fetching weeks:', err);
-      return res.status(500).send(`
-        <h1>Database Error</h1>
-        <p>Error fetching weeks: ${err.message}</p>
-        <a href="/">Back to Home</a>
-      `);
+      console.error(err);
+      return res.status(500).send('Database error');
     }
 
-    console.log(`✅ Found ${weeks.length} weeks`); // Debug log
-
-    // STEP 2: Get members (for the filter dropdown)
-    req.db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
+    // Get weeks from database with their current status
+    db.all(`SELECT * FROM weeks ORDER BY week_date`, (err, dbWeeks) => {
       if (err) {
-        console.error('❌ Error fetching members:', err);
-        // Don't fail completely, just use empty array
-        members = [];
+        console.error(err);
+        return res.status(500).send('Database error');
       }
 
-      console.log(`✅ Found ${members.length} members`); // Debug log
+      // Get nomination and voting counts for each week
+      db.all(`
+        SELECT 
+          w.id as week_id,
+          COUNT(DISTINCT n.id) as nomination_count,
+          COUNT(DISTINCT v.id) as vote_count
+        FROM weeks w
+        LEFT JOIN nominations n ON w.id = n.week_id
+        LEFT JOIN votes v ON w.id = v.week_id
+        GROUP BY w.id
+      `, (err, weekStats) => {
+        if (err) {
+          console.error(err);
+          return res.status(500).send('Database error');
+        }
 
-      // STEP 3: For each week, get some basic stats
-      // We'll do this the simple way - one query at a time
-      let processedWeeks = [];
-      let weekCount = 0;
-
-      // If no weeks, just show empty table
-      if (weeks.length === 0) {
-        console.log('📝 No weeks found, showing empty table');
-        return sendTableHTML([], members, res);
-      }
-
-      // Process each week to get additional data
-      weeks.forEach((week, index) => {
-        console.log(`📊 Processing week ${index + 1}/${weeks.length}: ${week.week_date}`);
-        
-        // Get nominations count for this week
-        req.db.all("SELECT COUNT(*) as count FROM nominations WHERE week_id = ?", [week.id], (err, nominationResult) => {
-          let nominationCount = 0;
-          if (!err && nominationResult.length > 0) {
-            nominationCount = nominationResult[0].count;
+        // Get user voting and nomination status for all weeks
+        db.all(`
+          SELECT v.week_id, v.user_name, 'vote' as type
+          FROM votes v
+          UNION ALL
+          SELECT n.week_id, n.user_name, 'nomination' as type  
+          FROM nominations n
+        `, (err, userActivity) => {
+          if (err) {
+            console.error(err);
+            return res.status(500).send('Database error');
           }
 
-          // Get votes count for this week
-          req.db.all("SELECT COUNT(*) as count FROM votes WHERE week_id = ?", [week.id], (err, voteResult) => {
-            let voteCount = 0;
-            if (!err && voteResult.length > 0) {
-              voteCount = voteResult[0].count;
+          // Get winner information for completed weeks
+          db.all(`
+            SELECT w.id as week_id, n.film_title, n.film_year, n.user_name as nominator
+            FROM weeks w
+            JOIN nominations n ON w.winner_film_id = n.id
+            WHERE w.phase = 'complete'
+          `, (err, winners) => {
+            if (err) {
+              console.error(err);
+              return res.status(500).send('Database error');
             }
 
-            // Get winner info for this week (if it has one)
-            req.db.get(`
-              SELECT n.film_title, n.film_year, n.user_name as nominator 
-              FROM nominations n 
-              WHERE n.id = ?
-            `, [week.winner_film_id], (err, winner) => {
-              
-              // Add all the data to our week object
-              const processedWeek = {
-                ...week,
-                nominationCount: nominationCount,
-                voteCount: voteCount,
-                winner: winner || null,
-                // Format the date nicely
-                displayDate: formatDateNicely(week.week_date),
-                // Determine if this week is current/past/future
-                timeStatus: getTimeStatus(week.week_date)
+            // Create lookup objects
+            const statsLookup = {};
+            weekStats.forEach(stat => {
+              statsLookup[stat.week_id] = {
+                nominations: stat.nomination_count,
+                votes: stat.vote_count
               };
-
-              processedWeeks.push(processedWeek);
-              weekCount++;
-
-              // When we've processed all weeks, send the response
-              if (weekCount === weeks.length) {
-                console.log('✅ All weeks processed, sending HTML');
-                // Sort by date (newest first)
-                processedWeeks.sort((a, b) => new Date(b.week_date) - new Date(a.week_date));
-                sendTableHTML(processedWeeks, members, res);
-              }
             });
+
+            const winnersLookup = {};
+            winners.forEach(winner => {
+              winnersLookup[winner.week_id] = {
+                title: winner.film_title,
+                year: winner.film_year,
+                nominator: winner.nominator
+              };
+            });
+
+            // Merge generated weeks with database data
+            const weeksData = weeks.map(week => {
+              const dbWeek = dbWeeks.find(w => w.week_date === week.date);
+              const stats = dbWeek ? statsLookup[dbWeek.id] || { nominations: 0, votes: 0 } : { nominations: 0, votes: 0 };
+              const winner = dbWeek ? winnersLookup[dbWeek.id] : null;
+              
+              return {
+                ...week,
+                id: dbWeek?.id,
+                genre: dbWeek?.genre,
+                phase: dbWeek?.phase || 'planning',
+                created_by: dbWeek?.created_by,
+                stats,
+                winner
+              };
+            });
+
+            // Split weeks into sections
+            const pastWeeks = weeksData.filter(w => w.isPastWeek);
+            const currentWeek = weeksData.find(w => w.isCurrentWeek);
+            const nearFutureWeeks = weeksData.filter(w => w.isNearFuture);
+            const farFutureWeeks = weeksData.filter(w => w.isFarFuture);
+
+            res.send(`
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Film Club</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <link rel="stylesheet" href="/styles/main.css">
+              </head>
+              <body>
+                <div class="user-select">
+                  <label>You are: </label>
+                  <select id="currentUser" onchange="setCurrentUser()">
+                    <option value="">Select your name</option>
+                    ${members.map(member => `<option value="${member.name}">${member.name}</option>`).join('')}
+                  </select>
+                </div>
+
+                <div class="container">
+                  <div class="header">
+                    <h1>🎬 Film Club Calendar</h1>
+                    <p>Manage your weekly film selections and voting</p>
+                  </div>
+
+                  <div class="nav-buttons">
+                    <a href="/manage-genres">🎭 Manage Genres</a>
+                    <a href="/statistics">📊 Statistics</a>
+                    <a href="/admin/table-view">📋 Table View</a>
+                    <a href="/admin/import-genres" id="adminLink" style="display: none;">🔧 Admin</a>
+                  </div>
+
+                  <!-- Recent Past Weeks -->
+                  ${pastWeeks.length > 0 ? `
+                    <div class="section-header">
+                      <h2>📅 Recent Weeks</h2>
+                    </div>
+                    <div id="pastWeeksList">
+                      ${pastWeeks.map(week => renderCompactWeek(week)).join('')}
+                    </div>
+                  ` : ''}
+
+                  <!-- Current Week -->
+                  ${currentWeek ? `
+                    <div class="section-header">
+                      <h2>⭐ This Week</h2>
+                    </div>
+                    <div id="currentWeek">
+                      ${renderFullWeek(currentWeek, userActivity)}
+                    </div>
+                  ` : ''}
+
+                  <!-- Next Few Weeks -->
+                  ${nearFutureWeeks.length > 0 ? `
+                    <div class="section-header">
+                      <h2>📋 Upcoming Weeks</h2>
+                    </div>
+                    <div id="nearFutureWeeksList">
+                      ${nearFutureWeeks.map(week => renderFullWeek(week, userActivity)).join('')}
+                    </div>
+                  ` : ''}
+
+                  <!-- Far Future Weeks -->
+                  ${farFutureWeeks.length > 0 ? `
+                    <div class="section-header">
+                      <h2>🔮 Future Schedule</h2>
+                    </div>
+                    <div id="farFutureWeeksList" class="compact-weeks">
+                      ${farFutureWeeks.map(week => renderCompactWeek(week)).join('')}
+                    </div>
+                  ` : ''}
+                </div>
+
+                <script>
+                // Store user activity data
+                const userActivity = ${JSON.stringify(userActivity)};
+                
+                function setCurrentUser() {
+                  const user = document.getElementById('currentUser').value;
+                  localStorage.setItem('currentUser', user);
+                  toggleAdminLink(user);
+                  updateWeekActions(user);
+                }
+
+                function getCurrentUser() {
+                  return localStorage.getItem('currentUser');
+                }
+
+                function checkUserAndGo(url) {
+                  const user = getCurrentUser();
+                  if (!user) {
+                    alert('Please select your name first!');
+                    return false;
+                  }
+                  window.location.href = url;
+                }
+
+                function checkUserAndGoWithUser(baseUrl) {
+                  const user = getCurrentUser();
+                  if (!user) {
+                    alert('Please select your name first!');
+                    return false;
+                  }
+                  window.location.href = baseUrl + '?user=' + encodeURIComponent(user);
+                  return true;
+                }
+
+                function checkAdminAndGo(url) {
+                  const user = getCurrentUser();
+                  if (!user) {
+                    alert('Please select your name first!');
+                    return false;
+                  }
+                  
+                  if (user === 'Bels' || user === 'Scott') {
+                    window.location.href = url;
+                    return true;
+                  } else {
+                    alert('Only admins can change genres after nomination phase!');
+                    return false;
+                  }
+                }
+
+                function toggleAdminLink(user) {
+                  const adminLink = document.getElementById('adminLink');
+                  const adminButtons = document.querySelectorAll('.admin-only');
+                  
+                  if (user === 'Bels' || user === 'Scott') {
+                    adminLink.style.display = 'inline-block';
+                    adminButtons.forEach(btn => btn.style.display = 'inline-block');
+                  } else {
+                    adminLink.style.display = 'none';
+                    adminButtons.forEach(btn => btn.style.display = 'none');
+                  }
+                }
+                
+                function updateWeekActions(user) {
+                  if (!user) return;
+                  
+                  const userVotes = userActivity.filter(activity => 
+                    activity.user_name === user && activity.type === 'vote'
+                  );
+                  const userNominations = userActivity.filter(activity => 
+                    activity.user_name === user && activity.type === 'nomination'
+                  );
+                  
+                  document.querySelectorAll('.week-actions').forEach(actionsDiv => {
+                    const weekId = parseInt(actionsDiv.dataset.weekId);
+                    const weekDate = actionsDiv.dataset.weekDate;
+                    const weekPhase = actionsDiv.dataset.weekPhase;
+                    
+                    let actions = '';
+                    
+                    if (weekPhase === 'planning') {
+                      actions += '<a href="/set-genre/' + weekDate + '" class="btn btn-primary" onclick="return checkUserAndGo(\'/set-genre/' + weekDate + '\')">Set Genre</a>';
+                    } else if (weekPhase === 'genre') {
+                      actions += '<a href="/random-genre/' + weekDate + '" class="btn btn-warning" onclick="return checkUserAndGo(\'/random-genre/' + weekDate + '\')">Random Genre</a>';
+                    } else if (weekPhase === 'nomination') {
+                      const userNominated = userNominations.some(nom => nom.week_id === weekId);
+                      
+                      if (userNominated) {
+                        actions += '<a href="/nominate/' + weekDate + '" class="btn btn-success btn-outline" onclick="checkUserAndGoWithUser(\'/nominate/' + weekDate + '\'); return false;">✓ Edit Nomination</a>';
+                      } else {
+                        actions += '<a href="/nominate/' + weekDate + '" class="btn btn-success" onclick="checkUserAndGoWithUser(\'/nominate/' + weekDate + '\'); return false;">Nominate Film</a>';
+                      }
+                      actions += '<a href="/set-genre/' + weekDate + '" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo(\'/set-genre/' + weekDate + '\')">Change Genre</a>';
+                    } else if (weekPhase === 'voting') {
+                      const userVoted = userVotes.some(vote => vote.week_id === weekId);
+                      
+                      if (userVoted) {
+                        actions += '<a href="/vote/' + weekDate + '" class="btn btn-warning btn-outline" onclick="checkUserAndGoWithUser(\'/vote/' + weekDate + '\'); return false;">✓ View Your Vote</a>';
+                      } else {
+                        actions += '<a href="/vote/' + weekDate + '" class="btn btn-warning" onclick="checkUserAndGoWithUser(\'/vote/' + weekDate + '\'); return false;">Vote</a>';
+                      }
+                      actions += '<a href="/set-genre/' + weekDate + '" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo(\'/set-genre/' + weekDate + '\')">Change Genre</a>';
+                    } else if (weekPhase === 'complete') {
+                      actions += '<a href="/results/' + weekDate + '" class="btn btn-success">View Results</a>';
+                    }
+                    
+                    actionsDiv.innerHTML = actions;
+                  });
+                  
+                  toggleAdminLink(user);
+                }
+
+                // Enhanced current week film display functions
+                function loadCurrentWeekFilms() {
+                  // Find current week element
+                  const currentWeekElement = document.querySelector('[id^="currentWeekFilms-"]');
+                  if (!currentWeekElement) return;
+                  
+                  const weekId = currentWeekElement.id.split('-')[1];
+                  
+                  // Fetch current week films with enhanced data
+                  fetch('/api/week/' + weekId + '/films')
+                    .then(response => response.json())
+                    .then(data => {
+                      if (data.films && data.films.length > 0) {
+                        currentWeekElement.innerHTML = renderCurrentWeekFilms(data.films);
+                      }
+                    })
+                    .catch(error => {
+                      console.error('Error loading current week films:', error);
+                    });
+                }
+
+                function renderCurrentWeekFilms(films) {
+                  if (films.length === 1) {
+                    // Single film - hero display
+                    const film = films[0];
+                    return renderFilmShowcase(film);
+                  } else if (films.length > 1) {
+                    // Multiple films - grid display
+                    return `
+                      <div class="current-week-grid">
+                        ${films.map(film => renderFilmCardCompact(film)).join('')}
+                      </div>
+                    `;
+                  }
+                  return '';
+                }
+
+                function renderFilmShowcase(film) {
+                  const backdropUrl = film.backdrop_url ? `https://image.tmdb.org/t/p/w1280${film.backdrop_url}` : '';
+                  const posterUrl = film.poster_url ? `https://image.tmdb.org/t/p/w500${film.poster_url}` : '';
+                  const rating = film.vote_average ? parseFloat(film.vote_average).toFixed(1) : 'N/A';
+                  const runtime = film.runtime ? `${film.runtime} min` : '';
+                  const releaseDate = film.release_date ? new Date(film.release_date).getFullYear() : '';
+                  
+                  return `
+                    <div class="film-showcase">
+                      ${backdropUrl ? `<img src="${backdropUrl}" alt="${film.film_title}" class="film-backdrop">` : ''}
+                      <div class="film-backdrop-overlay"></div>
+                      
+                      <div class="film-content">
+                        ${posterUrl ? `<img src="${posterUrl}" alt="${film.film_title}" class="film-poster-large">` : ''}
+                        
+                        <div class="film-details-large">
+                          <h2 class="film-title-large">
+                            ${film.film_title} 
+                            <span class="film-year-large">(${film.film_year})</span>
+                          </h2>
+                          
+                          <div class="film-meta-large">
+                            ${rating !== 'N/A' ? `<div class="film-rating">${rating}</div>` : ''}
+                            ${releaseDate ? `<span class="film-meta-item">${releaseDate}</span>` : ''}
+                            ${film.tmdb_genres ? `<span class="film-meta-item">${film.tmdb_genres}</span>` : ''}
+                            ${runtime ? `<span class="film-meta-item">${runtime}</span>` : ''}
+                          </div>
+                          
+                          ${film.overview ? `
+                            <div class="film-overview-large">
+                              ${film.overview}
+                            </div>
+                          ` : ''}
+                          
+                          <div class="film-credits">
+                            ${film.director ? `
+                              <div class="film-director">
+                                <strong>Director:</strong> ${film.director}
+                              </div>
+                            ` : ''}
+                            <div class="film-nominator">
+                              <strong>Nominated by:</strong> ${film.user_name}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }
+
+                function renderFilmCardCompact(film) {
+                  const backdropUrl = film.backdrop_url ? `https://image.tmdb.org/t/p/w500${film.backdrop_url}` : '';
+                  const posterUrl = film.poster_url ? `https://image.tmdb.org/t/p/w200${film.poster_url}` : '';
+                  const rating = film.vote_average ? parseFloat(film.vote_average).toFixed(1) : 'N/A';
+                  const releaseDate = film.release_date ? new Date(film.release_date).getFullYear() : '';
+                  
+                  return `
+                    <div class="film-card-compact">
+                      <div class="film-card-backdrop">
+                        ${backdropUrl ? `<img src="${backdropUrl}" alt="${film.film_title}">` : ''}
+                        ${posterUrl ? `<img src="${posterUrl}" alt="${film.film_title}" class="film-card-poster">` : ''}
+                      </div>
+                      
+                      <div class="film-card-content">
+                        <h4 class="film-card-title">${film.film_title} (${film.film_year})</h4>
+                        
+                        <div class="film-card-meta">
+                          ${rating !== 'N/A' ? `<span class="film-card-rating">⭐ ${rating}</span>` : ''}
+                          ${releaseDate ? `<span>${releaseDate}</span>` : ''}
+                          ${film.runtime ? `<span>${film.runtime} min</span>` : ''}
+                        </div>
+                        
+                        <div class="film-card-nominator">
+                          Nominated by ${film.user_name}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }
+
+                window.onload = function() {
+                  const savedUser = localStorage.getItem('currentUser');
+                  if (savedUser) {
+                    document.getElementById('currentUser').value = savedUser;
+                    toggleAdminLink(savedUser);
+                    updateWeekActions(savedUser);
+                  }
+                  
+                  // Load enhanced current week films
+                  loadCurrentWeekFilms();
+                }
+                </script>
+              </body>
+              </html>
+            `);
+
+            // Helper function to render full week card (current + next 3 weeks)
+            function renderFullWeek(week, userActivity) {
+              return `
+                <div class="week-card">
+                  <div class="week-info">
+                    <h3>${week.displayDate}</h3>
+                    <div class="genre-info">
+                      <strong>Genre:</strong> ${week.genre || 'Not set'}
+                      ${week.created_by ? `<span class="genre-creator">by ${week.created_by}</span>` : ''}
+                    </div>
+                    
+                    ${week.isCurrentWeek ? `
+                      <!-- Progress Indicator (only for current week) -->
+                      <div class="progress-indicator">
+                        <div class="progress-step ${week.phase === 'planning' ? 'active' : week.genre ? 'completed' : ''}">
+                          <span class="step-icon">🎭</span>
+                          <span class="step-label">Genre</span>
+                        </div>
+                        <div class="progress-step ${week.phase === 'nomination' ? 'active' : ['voting', 'complete'].includes(week.phase) ? 'completed' : ''}">
+                          <span class="step-icon">🎬</span>
+                          <span class="step-label">Nominations</span>
+                        </div>
+                        <div class="progress-step ${week.phase === 'voting' ? 'active' : week.phase === 'complete' ? 'completed' : ''}">
+                          <span class="step-icon">🗳️</span>
+                          <span class="step-label">Voting</span>
+                        </div>
+                        <div class="progress-step ${week.phase === 'complete' ? 'completed' : ''}">
+                          <span class="step-icon">🏆</span>
+                          <span class="step-label">Results</span>
+                        </div>
+                      </div>
+                    ` : ''}
+
+                    <!-- Status Info -->
+                    <div class="week-status">
+                      ${week.phase === 'planning' ? '<span class="status-text">Ready to set genre</span>' : ''}
+                      ${week.phase === 'genre' ? '<span class="status-text">Ready for random genre selection</span>' : ''}
+                      ${week.phase === 'nomination' ? `<span class="status-text">${week.stats.nominations} nomination${week.stats.nominations !== 1 ? 's' : ''} received</span>` : ''}
+                      ${week.phase === 'voting' ? `<span class="status-text">${week.stats.votes} vote${week.stats.votes !== 1 ? 's' : ''} submitted</span>` : ''}
+                      ${week.phase === 'complete' && week.winner ? `<span class="status-text">🏆 Winner: ${week.winner.title} (${week.winner.nominator})</span>` : ''}
+                    </div>
+                  </div>
+                  
+                  <div class="actions">
+                    <span class="phase-badge phase-${week.phase}">${week.phase}</span>
+                    <div class="week-actions" data-week-id="${week.id}" data-week-date="${week.date}" data-week-phase="${week.phase}">
+                      <!-- Actions will be populated by JavaScript -->
+                    </div>
+                  </div>
+                </div>
+                
+                ${week.isCurrentWeek && ['nomination', 'voting', 'complete'].includes(week.phase) ? `
+                  <!-- Enhanced Current Week Film Display -->
+                  <div class="current-week-films" id="currentWeekFilms-${week.id}">
+                    <!-- This will be populated by JavaScript with enhanced film data -->
+                  </div>
+                ` : ''}
+              `;
+            }
+
+            // Helper function to render compact week card (past + far future weeks)
+            function renderCompactWeek(week) {
+              return `
+                <div class="week-card compact">
+                  <div class="week-info">
+                    <div class="compact-header">
+                      <h4>${week.shortDate}</h4>
+                      <span class="phase-badge phase-${week.phase}">${week.phase}</span>
+                    </div>
+                    
+                    <div class="compact-content">
+                      <div class="genre-line">
+                        <strong>Genre:</strong> ${week.genre || 'Not set'}
+                      </div>
+                      
+                      ${week.winner ? `
+                        <div class="winner-line">
+                          <strong>🏆 Winner:</strong> ${week.winner.title} (${week.winner.year}) 
+                          <span class="nominator">by ${week.winner.nominator}</span>
+                        </div>
+                      ` : ''}
+                    </div>
+                  </div>
+                  
+                  <div class="compact-actions">
+                    ${week.phase === 'complete' ? `
+                      <a href="/results/${week.date}" class="btn btn-success btn-small">View Results</a>
+                    ` : week.phase === 'planning' ? `
+                      <div class="week-actions" data-week-id="${week.id}" data-week-date="${week.date}" data-week-phase="${week.phase}">
+                        <!-- Actions populated by JavaScript -->
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              `;
+            }
           });
         });
       });
@@ -107,457 +631,9 @@ router.get('/admin/table-view', (req, res) => {
   });
 });
 
-// Helper function to format dates nicely
-function formatDateNicely(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { 
-    weekday: 'short',
-    month: 'short', 
-    day: 'numeric',
-    year: 'numeric'
-  });
-}
 
-// Helper function to determine if week is current/past/future
-function getTimeStatus(weekDate) {
-  const week = new Date(weekDate);
-  const today = new Date();
-  const daysDiff = Math.floor((week - today) / (1000 * 60 * 60 * 24));
-  
-  if (daysDiff < -7) return 'past';
-  if (daysDiff >= -7 && daysDiff < 0) return 'recent';
-  if (daysDiff >= 0 && daysDiff < 7) return 'current';
-  if (daysDiff >= 7) return 'future';
-  return 'unknown';
-}
-
-// Helper function to send the HTML response
-function sendTableHTML(weeks, members, res) {
-  console.log('🎨 Generating HTML for table view');
-  
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>📋 Table View - Film Club</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link rel="stylesheet" href="/styles/main.css">
-      <style>
-        /* Simple table styles */
-        .table-container {
-          overflow-x: auto;
-          margin: 20px 0;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          background: white;
-        }
-        
-        .data-table {
-          width: 100%;
-          border-collapse: collapse;
-          font-size: 14px;
-        }
-        
-        .data-table th {
-          background: #f5f5f5;
-          padding: 12px;
-          text-align: left;
-          font-weight: bold;
-          border-bottom: 2px solid #ddd;
-          position: sticky;
-          top: 0;
-        }
-        
-        .data-table td {
-          padding: 12px;
-          border-bottom: 1px solid #eee;
-        }
-        
-        .data-table tbody tr:hover {
-          background: #f9f9f9;
-        }
-        
-        /* Row colors based on time status */
-        .row-current {
-          background: #fff3cd !important;
-        }
-        
-        .row-recent {
-          background: #d1edcc !important;
-        }
-        
-        .row-future {
-          background: #cce8ff !important;
-        }
-        
-        /* Phase badges */
-        .phase-badge {
-          padding: 4px 8px;
-          border-radius: 12px;
-          font-size: 12px;
-          font-weight: bold;
-          text-transform: uppercase;
-        }
-        
-        .phase-planning { background: #e0e7ff; color: #3730a3; }
-        .phase-genre { background: #fed7aa; color: #c2410c; }
-        .phase-nomination { background: #bbf7d0; color: #166534; }
-        .phase-voting { background: #fce7f3; color: #be185d; }
-        .phase-complete { background: #e9d5ff; color: #7c3aed; }
-        
-        /* Stats */
-        .stat-number {
-          font-weight: bold;
-          color: #059669;
-        }
-        
-        .winner-info {
-          font-weight: bold;
-          color: #dc2626;
-        }
-        
-        /* Controls */
-        .controls {
-          display: flex;
-          gap: 15px;
-          margin-bottom: 20px;
-          flex-wrap: wrap;
-          align-items: center;
-        }
-        
-        .filter-group {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-        
-        .filter-group label {
-          font-weight: 500;
-          color: #374151;
-        }
-        
-        .filter-group select,
-        .filter-group input {
-          padding: 6px 10px;
-          border: 1px solid #d1d5db;
-          border-radius: 4px;
-          font-size: 14px;
-        }
-        
-        /* Summary stats */
-        .summary-stats {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-          gap: 15px;
-          margin-bottom: 20px;
-        }
-        
-        .summary-stat {
-          background: white;
-          padding: 15px;
-          border-radius: 8px;
-          border: 1px solid #e5e7eb;
-          text-align: center;
-        }
-        
-        .summary-stat .number {
-          font-size: 24px;
-          font-weight: bold;
-          color: #1f2937;
-          display: block;
-        }
-        
-        .summary-stat .label {
-          font-size: 12px;
-          color: #6b7280;
-          text-transform: uppercase;
-          margin-top: 4px;
-        }
-        
-        .no-data {
-          text-align: center;
-          padding: 40px;
-          color: #6b7280;
-        }
-        
-        /* Mobile responsive */
-        @media (max-width: 768px) {
-          .data-table {
-            font-size: 12px;
-          }
-          
-          .data-table th,
-          .data-table td {
-            padding: 8px;
-          }
-          
-          .controls {
-            flex-direction: column;
-            align-items: stretch;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>📋 Table View</h1>
-          <p>All weeks in a simple, easy-to-read table format</p>
-        </div>
-        
-        <!-- Summary Stats -->
-        <div class="summary-stats">
-          <div class="summary-stat">
-            <span class="number">${weeks.length}</span>
-            <span class="label">Total Weeks</span>
-          </div>
-          <div class="summary-stat">
-            <span class="number">${weeks.filter(w => w.phase === 'complete').length}</span>
-            <span class="label">Completed</span>
-          </div>
-          <div class="summary-stat">
-            <span class="number">${weeks.filter(w => w.phase === 'voting').length}</span>
-            <span class="label">Voting</span>
-          </div>
-          <div class="summary-stat">
-            <span class="number">${weeks.filter(w => w.phase === 'nomination').length}</span>
-            <span class="label">Nominating</span>
-          </div>
-          <div class="summary-stat">
-            <span class="number">${weeks.filter(w => w.genre).length}</span>
-            <span class="label">Genres Set</span>
-          </div>
-        </div>
-
-        <!-- Simple Controls -->
-        <div class="controls">
-          <div class="filter-group">
-            <label>Phase:</label>
-            <select id="phaseFilter" onchange="filterTable()">
-              <option value="">All Phases</option>
-              <option value="planning">Planning</option>
-              <option value="genre">Genre Selection</option>
-              <option value="nomination">Nomination</option>
-              <option value="voting">Voting</option>
-              <option value="complete">Complete</option>
-            </select>
-          </div>
-          
-          <div class="filter-group">
-            <label>Genre:</label>
-            <input type="text" id="genreFilter" placeholder="Search genres..." onkeyup="filterTable()">
-          </div>
-          
-          <button onclick="exportToCSV()" class="btn btn-secondary" style="margin-left: auto;">
-            📥 Export CSV
-          </button>
-        </div>
-
-        <!-- Simple Table -->
-        <div class="table-container">
-          <table class="data-table" id="dataTable">
-            <thead>
-              <tr>
-                <th onclick="sortTable(0)">Date ↕</th>
-                <th onclick="sortTable(1)">Genre ↕</th>
-                <th onclick="sortTable(2)">Phase ↕</th>
-                <th>Nominations</th>
-                <th>Votes</th>
-                <th>Winner</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="tableBody">
-              ${weeks.length === 0 ? `
-                <tr>
-                  <td colspan="7" class="no-data">
-                    <p>No weeks found yet!</p>
-                    <p>Start by <a href="/">setting up your first week</a>.</p>
-                  </td>
-                </tr>
-              ` : weeks.map(week => `
-                <tr class="row-${week.timeStatus}" 
-                    data-phase="${week.phase}"
-                    data-genre="${week.genre || ''}"
-                    data-year="${new Date(week.week_date).getFullYear()}">
-                  <td>
-                    <strong>${week.displayDate}</strong>
-                  </td>
-                  <td>
-                    ${week.genre ? week.genre : '<em style="color: #999;">Not set</em>'}
-                    ${week.created_by ? `<br><small style="color: #666;">by ${week.created_by}</small>` : ''}
-                  </td>
-                  <td>
-                    <span class="phase-badge phase-${week.phase}">${week.phase}</span>
-                  </td>
-                  <td>
-                    <span class="stat-number">${week.nominationCount}</span>
-                  </td>
-                  <td>
-                    <span class="stat-number">${week.voteCount}</span>
-                  </td>
-                  <td>
-                    ${week.winner ? `
-                      <div class="winner-info">
-                        🏆 ${week.winner.film_title}
-                        ${week.winner.film_year ? `(${week.winner.film_year})` : ''}
-                        <br>
-                        <small style="color: #666;">by ${week.winner.nominator}</small>
-                      </div>
-                    ` : '-'}
-                  </td>
-                  <td>
-                    ${week.phase === 'complete' ? 
-                      `<a href="/results/${week.week_date}" class="btn btn-success btn-small">Results</a>` :
-                      week.phase === 'voting' ? 
-                      `<a href="/vote/${week.week_date}" class="btn btn-warning btn-small">Vote</a>` :
-                      week.phase === 'nomination' ? 
-                      `<a href="/nominate/${week.week_date}" class="btn btn-primary btn-small">Nominate</a>` :
-                      `<a href="/set-genre/${week.week_date}" class="btn btn-secondary btn-small">Set Genre</a>`
-                    }
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-
-        <div class="actions" style="margin-top: 30px; text-align: center;">
-          <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
-          <a href="/" class="btn btn-primary">Calendar View</a>
-        </div>
-      </div>
-
-      <script>
-        console.log('📋 Table view loaded with ${weeks.length} weeks');
-        
-        let sortColumn = -1;
-        let sortDirection = 1;
-        
-        // Simple filter function
-        function filterTable() {
-          const phaseFilter = document.getElementById('phaseFilter').value.toLowerCase();
-          const genreFilter = document.getElementById('genreFilter').value.toLowerCase();
-          
-          const rows = document.querySelectorAll('#tableBody tr');
-          
-          rows.forEach(row => {
-            // Skip the "no data" row
-            if (row.querySelector('.no-data')) {
-              return;
-            }
-            
-            const phase = row.dataset.phase || '';
-            const genre = row.dataset.genre.toLowerCase();
-            
-            let show = true;
-            
-            if (phaseFilter && phase !== phaseFilter) show = false;
-            if (genreFilter && !genre.includes(genreFilter)) show = false;
-            
-            row.style.display = show ? '' : 'none';
-          });
-          
-          console.log('🔍 Table filtered - Phase:', phaseFilter, 'Genre:', genreFilter);
-        }
-        
-        // Simple sort function
-        function sortTable(column) {
-          console.log('🔄 Sorting table by column', column);
-          
-          const tbody = document.getElementById('tableBody');
-          const rows = Array.from(tbody.querySelectorAll('tr'));
-          
-          // Skip sorting if only "no data" row
-          if (rows.length === 1 && rows[0].querySelector('.no-data')) {
-            return;
-          }
-          
-          // Toggle sort direction if same column
-          if (sortColumn === column) {
-            sortDirection *= -1;
-          } else {
-            sortDirection = 1;
-            sortColumn = column;
-          }
-          
-          rows.sort((a, b) => {
-            let aVal = a.cells[column].textContent.trim();
-            let bVal = b.cells[column].textContent.trim();
-            
-            // Handle dates (column 0)
-            if (column === 0) {
-              aVal = new Date(aVal);
-              bVal = new Date(bVal);
-              return sortDirection * (aVal - bVal);
-            }
-            
-            // Handle numbers (columns 3, 4)
-            if (column === 3 || column === 4) {
-              aVal = parseInt(aVal) || 0;
-              bVal = parseInt(bVal) || 0;
-              return sortDirection * (aVal - bVal);
-            }
-            
-            // Handle text
-            return sortDirection * aVal.localeCompare(bVal);
-          });
-          
-          // Re-append sorted rows
-          rows.forEach(row => tbody.appendChild(row));
-          
-          console.log('✅ Table sorted');
-        }
-        
-        // Simple CSV export function
-        function exportToCSV() {
-          console.log('📥 Exporting to CSV');
-          
-          const table = document.getElementById('dataTable');
-          const rows = table.querySelectorAll('tr');
-          const csv = [];
-          
-          rows.forEach(row => {
-            const cols = row.querySelectorAll('td, th');
-            const rowData = [];
-            
-            cols.forEach((col, index) => {
-              // Skip the actions column (last column)
-              if (index < cols.length - 1) {
-                let text = col.textContent.trim();
-                // Clean up text
-                text = text.replace(/🏆/g, '').replace(/\\s+/g, ' ');
-                // Quote if contains comma
-                if (text.includes(',')) {
-                  text = '"' + text + '"';
-                }
-                rowData.push(text);
-              }
-            });
-            
-            if (rowData.length > 0) {
-              csv.push(rowData.join(','));
-            }
-          });
-          
-          // Download CSV
-          const csvContent = csv.join('\\n');
-          const blob = new Blob([csvContent], { type: 'text/csv' });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'film-club-data-' + new Date().toISOString().split('T')[0] + '.csv';
-          a.click();
-          window.URL.revokeObjectURL(url);
-          
-          console.log('✅ CSV exported');
-        }
-      </script>
-    </body>
-    </html>
-  `;
-  
-  res.send(html);
-}
-
-module.exports = router;
+// Start the server
+app.listen(port, () => {
+  console.log(`🎬 Film Club app running on port ${port}`);
+  console.log(`Visit http://localhost:${port} to get started!`);
+});
