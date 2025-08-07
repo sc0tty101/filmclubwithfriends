@@ -14,6 +14,7 @@ const adminRoutes = require('./routes/admin');
 const filmsRoutes = require('./routes/films');
 const votesRoutes = require('./routes/votes');
 const resultsRoutes = require('./routes/results');
+const statisticsRoutes = require('./routes/statistics');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
@@ -34,6 +35,7 @@ app.use('/', adminRoutes);
 app.use('/', filmsRoutes);
 app.use('/', votesRoutes);
 app.use('/', resultsRoutes);
+app.use('/', statisticsRoutes);
 
 // API endpoint for current week films with enhanced data
 app.get('/api/week/:weekId/films', (req, res) => {
@@ -624,30 +626,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// STATISTICS PAGE (placeholder for now)
-app.get('/statistics', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Statistics - Film Club</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <link rel="stylesheet" href="/styles/main.css">
-    </head>
-    <body>
-      <div class="container">
-        <div class="card">
-          <h1>📊 Statistics</h1>
-          <p>Statistics and awards features coming soon!</p>
-          <p>This will show member voting patterns, popular genres, and end-of-year awards.</p>
-          <br>
-          <a href="/" class="btn">Back to Calendar</a>
-        </div>
-      </div>
-    </body>
-    </html>
-  `);
-});
 
 // Start the server
 app.listen(port, () => {
