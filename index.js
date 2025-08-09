@@ -364,7 +364,8 @@ app.get('/', (req, res) => {
                     let actions = '';
                     
                     if (weekPhase === 'planning') {
-                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-primary" onclick="return checkUserAndGo('/set-genre/${weekDate}')">Set Genre</a>`;
+
+                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-primary" onclick="return checkUserAndGo(\"/set-genre/${weekDate}\")">Set Genre</a>`;                    
                     } else if (weekPhase === 'genre') {
                       actions += `<a href="/random-genre/${weekDate}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${weekDate}')">Random Genre</a>`;
                     } else if (weekPhase === 'nomination') {
