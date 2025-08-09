@@ -84,3 +84,22 @@ router.get('/admin/table-view', (req, res) => {
                           week.phase === 'nomination' ? `<a href="/nominate/${week.week_date}" class="btn btn-small btn-success">Nominate</a>` :
                           week.phase === 'voting' ? `<a href="/vote/${week.week_date}" class="btn btn-small btn-warning">Vote</a>` : '-'}
                       </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="actions center">
+            <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
+            <a href="/" class="btn btn-primary">Calendar View</a>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+  });
+});
+
+module.exports = router;
