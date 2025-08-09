@@ -364,28 +364,27 @@ app.get('/', (req, res) => {
                     let actions = '';
                     
                     if (weekPhase === 'planning') {
-
-                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-primary" onclick="return checkUserAndGo(\"/set-genre/${weekDate}\")">Set Genre</a>`;                    
+                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-primary" onclick='return checkUserAndGo("/set-genre/${weekDate}")'>Set Genre</a>`;
                     } else if (weekPhase === 'genre') {
-                      actions += `<a href="/random-genre/${weekDate}" class="btn btn-warning" onclick="return checkUserAndGo('/random-genre/${weekDate}')">Random Genre</a>`;
+                      actions += `<a href="/random-genre/${weekDate}" class="btn btn-warning" onclick='return checkUserAndGo("/random-genre/${weekDate}")'>Random Genre</a>`;
                     } else if (weekPhase === 'nomination') {
                       const userNominated = userNominations.some(nom => nom.week_id === weekId);
                       
                       if (userNominated) {
-                        actions += `<a href="/nominate/${weekDate}" class="btn btn-success btn-outline" onclick="checkUserAndGoWithUser('/nominate/${weekDate}'); return false;">✓ Edit Nomination</a>`;
+                        actions += `<a href="/nominate/${weekDate}" class="btn btn-success btn-outline" onclick='checkUserAndGoWithUser("/nominate/${weekDate}"); return false;'>✓ Edit Nomination</a>`;
                       } else {
-                        actions += `<a href="/nominate/${weekDate}" class="btn btn-success" onclick="checkUserAndGoWithUser('/nominate/${weekDate}'); return false;">Nominate Film</a>`;
+                        actions += `<a href="/nominate/${weekDate}" class="btn btn-success" onclick='checkUserAndGoWithUser("/nominate/${weekDate}"); return false;'>Nominate Film</a>`;
                       }
-                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${weekDate}')">Change Genre</a>`;
+                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-secondary admin-only" onclick='return checkAdminAndGo("/set-genre/${weekDate}")'>Change Genre</a>`;
                     } else if (weekPhase === 'voting') {
                       const userVoted = userVotes.some(vote => vote.week_id === weekId);
                       
                       if (userVoted) {
-                        actions += `<a href="/vote/${weekDate}" class="btn btn-warning btn-outline" onclick="checkUserAndGoWithUser('/vote/${weekDate}'); return false;">✓ View Your Vote</a>`;
+                        actions += `<a href="/vote/${weekDate}" class="btn btn-warning btn-outline" onclick='checkUserAndGoWithUser("/vote/${weekDate}"); return false;'>✓ View Your Vote</a>`;
                       } else {
-                        actions += `<a href="/vote/${weekDate}" class="btn btn-warning" onclick="checkUserAndGoWithUser('/vote/${weekDate}'); return false;">Vote</a>`;
+                        actions += `<a href="/vote/${weekDate}" class="btn btn-warning" onclick='checkUserAndGoWithUser("/vote/${weekDate}"); return false;'>Vote</a>`;
                       }
-                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-secondary admin-only" onclick="return checkAdminAndGo('/set-genre/${weekDate}')">Change Genre</a>`;
+                      actions += `<a href="/set-genre/${weekDate}" class="btn btn-secondary admin-only" onclick='return checkAdminAndGo("/set-genre/${weekDate}")'>Change Genre</a>`;
                     } else if (weekPhase === 'complete') {
                       actions += `<a href="/results/${weekDate}" class="btn btn-success">View Results</a>`;
                     }
@@ -631,7 +630,6 @@ app.get('/', (req, res) => {
     });
   });
 });
-
 
 // Start the server
 app.listen(port, () => {
