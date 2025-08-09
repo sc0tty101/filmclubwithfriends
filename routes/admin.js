@@ -126,7 +126,33 @@ Adventures
             <h2>🗃️ Database Management</h2>
             <p><strong>⚠️ Development Tools - Use with caution!</strong></p>
 
-                     <!-- Table View Section -->
+            <div style="margin-bottom: 30px;">
+              <h3>Clear All Data</h3>
+              <p>Remove all data from the database while keeping the table structure intact. 
+                 Perfect for testing and development - no restart required!</p>
+              <p><strong>⚠️ This will delete:</strong> All weeks, nominations, votes, members, and genres!</p>
+              <p><strong>✅ Keeps:</strong> Database connection and table structure</p>
+              
+              <form action="/admin/clear-data" method="POST" onsubmit="return confirm('Are you sure? This will delete all data but keep the database structure.')">
+                <button type="submit" class="btn btn-warning">🧹 Clear All Data</button>
+              </form>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <h3>Reset Database</h3>
+              <p>Completely wipe the database file and recreate with the latest schema. 
+                 Useful for applying schema changes during development.</p>
+              <p><strong>⚠️ This will delete:</strong> All data AND recreate the database file!</p>
+              <p><strong>🔄 Requires:</strong> Application restart after use</p>
+              <p><small><strong>Database location:</strong> ${dbPath}</small></p>
+              
+              <form action="/admin/reset-database" method="POST" onsubmit="return confirm('Are you absolutely sure? This will delete ALL data and requires an app restart!')">
+                <button type="submit" class="btn btn-danger">🗑️ Reset Database</button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Table View Section -->
           <div class="card">
             <h2>📊 Data Views</h2>
             <p>Alternative views for your film club data</p>
@@ -150,19 +176,6 @@ Adventures
               <a href="/" class="btn btn-secondary">
                 📅 Calendar View
               </a>
-            </div>
-          </div>
-            
-            <div style="margin-bottom: 20px;">
-              <h3>Reset Database</h3>
-              <p>This will completely wipe all data and recreate the database with the latest schema. 
-                 Useful for applying schema changes during development.</p>
-              <p><strong>⚠️ This will delete:</strong> All weeks, nominations, votes, members, and genres!</p>
-              <p><small><strong>Database location:</strong> ${dbPath}</small></p>
-              
-              <form action="/admin/reset-database" method="POST" onsubmit="return confirm('Are you absolutely sure? This will delete ALL data and cannot be undone!')">
-                <button type="submit" class="btn btn-danger">🗑️ Reset Database</button>
-              </form>
             </div>
           </div>
 
@@ -354,6 +367,88 @@ router.post('/admin/toggle-admin', (req, res) => {
       res.redirect(`/admin/import-genres?message=Admin privileges ${action} for ${memberName}`);
     }
   );
+});
+
+// Handle clearing all data (keeps schema intact)
+router.post('/admin/clear-data', (req, res) => {
+  console.log('Starting data clear...');
+  
+  // Clear all data in correct order (respecting foreign keys)
+  const clearQueries = [
+    "DELETE FROM votes",
+    "DELETE FROM nominations", 
+    "DELETE FROM weeks",
+    "DELETE FROM members",
+    "DELETE FROM genres"
+  ];
+  
+  let completedQueries = 0;
+  let hasError = false;
+  
+  clearQueries.forEach((query, index) => {
+    req.db.run(query, function(err) {
+      if (err && !hasError) {
+        hasError = true;
+        console.error(`Error executing ${query}:`, err);
+        return res.status(500).send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Clear Data Error - Film Club</title>
+            <link rel="stylesheet" href="/styles/main.css">
+          </head>
+          <body>
+            <div class="container">
+              <div class="card">
+                <h1>❌ Clear Data Failed</h1>
+                <p>Error clearing data: ${err.message}</p>
+                <div class="actions">
+                  <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
+                </div>
+              </div>
+            </div>
+          </body>
+          </html>
+        `);
+      }
+      
+      if (!hasError) {
+        console.log(`Cleared: ${query} (${this.changes} rows deleted)`);
+        completedQueries++;
+        
+        // When all queries are done, show success
+        if (completedQueries === clearQueries.length) {
+          console.log('Data clear complete - all tables emptied');
+          
+          res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Data Cleared - Film Club</title>
+              <link rel="stylesheet" href="/styles/main.css">
+            </head>
+            <body>
+              <div class="container">
+                <div class="card">
+                  <h1>✅ All Data Cleared!</h1>
+                  <p>All data has been successfully removed from the database.</p>
+                  <p><strong>Tables are empty but structure remains intact.</strong></p>
+                  <p>You can now add fresh data without restarting the application.</p>
+                  
+                  <div class="actions">
+                    <a href="/admin/import-genres" class="btn btn-primary">Back to Admin</a>
+                    <a href="/manage-genres" class="btn btn-secondary">Add Genres</a>
+                    <a href="/" class="btn btn-success">Back to Calendar</a>
+                  </div>
+                </div>
+              </div>
+            </body>
+            </html>
+          `);
+        }
+      }
+    });
+  });
 });
 
 // Handle database reset - NOW USES CENTRALIZED SCHEMA
