@@ -27,6 +27,111 @@ function parseDate(dateStr, year) {
   return date.toISOString().split('T')[0];
 }
 
+// Helper function to extract year from film title
+function extractYearFromTitle(title) {
+  if (!title) return { title, year: null };
+  
+  let filmTitle = title.trim();
+  let filmYear = null;
+
+  // Try different year formats
+  const yearPatterns = [
+    /\((\d{4})\)$/,           // "Film Title (1999)" - at end in parentheses
+    /\((\d{4})\)/,            // "Film Title (1999) something" - anywhere in parentheses
+    /\s(\d{4})$/,             // "Film Title 1999" - at end with space
+    /\s-\s(\d{4})$/,          // "Film Title - 1999" - at end with dash
+    /\s\[(\d{4})\]$/,         // "Film Title [1999]" - at end in brackets
+  ];
+
+  for (const pattern of yearPatterns) {
+    const match = filmTitle.match(pattern);
+    if (match) {
+      filmYear = parseInt(match[1]);
+      // Remove the matched year from the title
+      filmTitle = filmTitle.replace(pattern, '').trim();
+      break; // Stop after first match
+    }
+  }
+
+  // Validate year is reasonable (between 1900 and current year + 5)
+  const currentYear = new Date().getFullYear();
+  if (filmYear && (filmYear < 1900 || filmYear > currentYear + 5)) {
+    console.log(`Invalid year ${filmYear} for film "${title}", ignoring year`);
+    filmYear = null;
+    filmTitle = title; // Reset to original title
+  }
+
+  return { title: filmTitle, year: filmYear };
+}
+
+// TMDB enhancement function
+async function enhanceWithTMDB(filmTitle, filmYear) {
+  const apiKey = process.env.TMDB_API_KEY;
+  if (!apiKey) {
+    console.warn('TMDB_API_KEY not available for enhancement');
+    return {};
+  }
+  
+  try {
+    // Search for the film
+    const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${apiKey}&query=${encodeURIComponent(filmTitle)}`;
+    const response = await fetch(searchUrl);
+    
+    if (!response.ok) {
+      throw new Error(`TMDB API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data.results && data.results.length > 0) {
+      // Find best match by year if we have one
+      let bestMatch = data.results[0];
+      
+      if (filmYear) {
+        const matchByYear = data.results.find(film => {
+          const tmdbYear = film.release_date ? parseInt(film.release_date.substring(0, 4)) : null;
+          return Math.abs(tmdbYear - filmYear) <= 1; // Allow 1 year difference
+        });
+        if (matchByYear) bestMatch = matchByYear;
+      }
+      
+      // Get detailed info
+      const detailsUrl = `https://api.themoviedb.org/3/movie/${bestMatch.id}?api_key=${apiKey}&append_to_response=credits`;
+      const detailsResponse = await fetch(detailsUrl);
+      
+      if (!detailsResponse.ok) {
+        throw new Error(`TMDB details API error: ${detailsResponse.status}`);
+      }
+      
+      const details = await detailsResponse.json();
+      
+      // Extract director
+      const director = details.credits?.crew?.find(person => person.job === 'Director')?.name || '';
+      const genres = details.genres?.map(g => g.name).join(', ') || '';
+      
+      console.log(`✅ Enhanced "${filmTitle}" (${filmYear}) with TMDB data`);
+      
+      return {
+        tmdb_id: details.id,
+        poster_url: details.poster_path || '',
+        backdrop_url: details.backdrop_path || '',
+        vote_average: details.vote_average || 0,
+        release_date: details.release_date || '',
+        runtime: details.runtime || 0,
+        overview: details.overview || '',
+        director: director,
+        tmdb_genres: genres
+      };
+    } else {
+      console.log(`⚠️ No TMDB results found for "${filmTitle}" (${filmYear})`);
+    }
+  } catch (error) {
+    console.error(`❌ TMDB lookup failed for "${filmTitle}":`, error.message);
+  }
+  
+  return {};
+}
+
 // Parse the raw data from spreadsheet
 function parseRawData(rawData) {
   const lines = rawData.trim().split('\n');
@@ -606,7 +711,7 @@ router.post('/admin/parse-import', (req, res) => {
   });
 });
 
-// Import historical data endpoint
+// Import historical data endpoint with TMDB enhancement
 router.post('/admin/import-historical', (req, res) => {
   const { nominations, members, fetchTMDB } = req.body;
   
@@ -617,6 +722,7 @@ router.post('/admin/import-historical', (req, res) => {
   let weeksImported = 0;
   let nominationsImported = 0;
   let membersCreated = 0;
+  let tmdbEnhanced = 0;
   const errors = [];
   const weekIds = {};
   
@@ -676,6 +782,7 @@ router.post('/admin/import-historical', (req, res) => {
               weeksImported,
               nominationsImported,
               membersCreated,
+              tmdbEnhanced: fetchTMDB ? tmdbEnhanced : null,
               errors: errors.length > 0 ? errors : null
             });
           });
@@ -715,7 +822,7 @@ router.post('/admin/import-historical', (req, res) => {
             // Process nominations for this week
             let nomIndex = 0;
             
-            function processNomination() {
+            async function processNomination() {
               if (nomIndex >= weekData.nominations.length) {
                 weekIndex++;
                 processWeek();
@@ -724,39 +831,102 @@ router.post('/admin/import-historical', (req, res) => {
               
               const nom = weekData.nominations[nomIndex];
               
-              // Extract year from film title if present (e.g., "Laura (1944)")
-              let filmTitle = nom.film;
-              let filmYear = null;
-              const yearMatch = filmTitle.match(/\((\d{4})\)$/);
-              if (yearMatch) {
-                filmYear = parseInt(yearMatch[1]);
-                filmTitle = filmTitle.replace(/\s*\(\d{4}\)$/, '').trim();
-              }
+              // Extract year from film title using improved logic
+              const { title: filmTitle, year: filmYear } = extractYearFromTitle(nom.film);
               
-              req.db.run(
-                `INSERT INTO nominations 
-                 (week_id, user_name, film_title, film_year, nominated_at) 
-                 VALUES (?, ?, ?, ?, datetime('now'))`,
-                [weekId, nom.nominator, filmTitle, filmYear],
-                function(err) {
-                  if (err) {
-                    errors.push(`Failed to import ${nom.film}: ${err.message}`);
-                  } else {
-                    nominationsImported++;
-                    
-                    // If this is the winner, update the week
-                    if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
-                      req.db.run(
-                        "UPDATE weeks SET winner_film_id = ?, winner_score = ? WHERE id = ?",
-                        [this.lastID, nom.voteScore, weekId]
-                      );
-                    }
-                  }
+              if (fetchTMDB) {
+                // Enhanced import with TMDB data
+                try {
+                  const tmdbData = await enhanceWithTMDB(filmTitle, filmYear);
                   
-                  nomIndex++;
-                  processNomination();
+                  req.db.run(
+                    `INSERT INTO nominations 
+                     (week_id, user_name, film_title, film_year, poster_url, backdrop_url, 
+                      tmdb_id, vote_average, release_date, runtime, overview, director, tmdb_genres, nominated_at) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+                    [
+                      weekId, nom.nominator, filmTitle, filmYear,
+                      tmdbData.poster_url || '', tmdbData.backdrop_url || '', tmdbData.tmdb_id || null,
+                      tmdbData.vote_average || 0, tmdbData.release_date || '', tmdbData.runtime || 0,
+                      tmdbData.overview || '', tmdbData.director || '', tmdbData.tmdb_genres || ''
+                    ],
+                    function(err) {
+                      if (err) {
+                        errors.push(`Failed to import ${nom.film}: ${err.message}`);
+                      } else {
+                        nominationsImported++;
+                        if (Object.keys(tmdbData).length > 0) {
+                          tmdbEnhanced++;
+                        }
+                        
+                        // If this is the winner, update the week
+                        if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
+                          req.db.run(
+                            "UPDATE weeks SET winner_film_id = ?, winner_score = ? WHERE id = ?",
+                            [this.lastID, nom.voteScore, weekId]
+                          );
+                        }
+                      }
+                      
+                      nomIndex++;
+                      processNomination();
+                    }
+                  );
+                } catch (error) {
+                  console.error(`TMDB enhancement failed for ${filmTitle}:`, error);
+                  // Fall back to basic import without TMDB data
+                  req.db.run(
+                    `INSERT INTO nominations 
+                     (week_id, user_name, film_title, film_year, nominated_at) 
+                     VALUES (?, ?, ?, ?, datetime('now'))`,
+                    [weekId, nom.nominator, filmTitle, filmYear],
+                    function(err) {
+                      if (err) {
+                        errors.push(`Failed to import ${nom.film}: ${err.message}`);
+                      } else {
+                        nominationsImported++;
+                        
+                        // If this is the winner, update the week
+                        if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
+                          req.db.run(
+                            "UPDATE weeks SET winner_film_id = ?, winner_score = ? WHERE id = ?",
+                            [this.lastID, nom.voteScore, weekId]
+                          );
+                        }
+                      }
+                      
+                      nomIndex++;
+                      processNomination();
+                    }
+                  );
                 }
-              );
+              } else {
+                // Regular import without TMDB data
+                req.db.run(
+                  `INSERT INTO nominations 
+                   (week_id, user_name, film_title, film_year, nominated_at) 
+                   VALUES (?, ?, ?, ?, datetime('now'))`,
+                  [weekId, nom.nominator, filmTitle, filmYear],
+                  function(err) {
+                    if (err) {
+                      errors.push(`Failed to import ${nom.film}: ${err.message}`);
+                    } else {
+                      nominationsImported++;
+                      
+                      // If this is the winner, update the week
+                      if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
+                        req.db.run(
+                          "UPDATE weeks SET winner_film_id = ?, winner_score = ? WHERE id = ?",
+                          [this.lastID, nom.voteScore, weekId]
+                        );
+                      }
+                    }
+                    
+                    nomIndex++;
+                    processNomination();
+                  }
+                );
+              }
             }
             
             processNomination();
