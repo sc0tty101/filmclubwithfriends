@@ -9,7 +9,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Import database
-const db = require('./database/setup');
+const dbModule = require('./database/setup');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
@@ -18,7 +18,7 @@ app.use(express.static('public'));
 
 // Make database available to all routes
 app.use((req, res, next) => {
-  req.db = db;
+  req.db = dbModule.db; // Use only the db instance for req.db
   next();
 });
 
