@@ -30,12 +30,16 @@ function getConsensusLevel(results) {
 router.get('/results/:date', (req, res) => {
   const weekDate = req.params.date;
   
-  // Get week info with winner details
+  // Get week info with winner details using JOINs
   req.db.get(`
-    SELECT w.*, n.film_title as winner_title, n.film_year as winner_year, 
-           n.poster_url as winner_poster, n.user_name as winner_nominator
+    SELECT w.*, r.total_points as winner_score,
+           f.title as winner_title, f.year as winner_year, 
+           f.poster_url as winner_poster, m.name as winner_nominator
     FROM weeks w 
-    LEFT JOIN nominations n ON w.winner_film_id = n.id 
+    LEFT JOIN results r ON w.id = r.week_id
+    LEFT JOIN nominations n ON r.winning_nomination_id = n.id 
+    LEFT JOIN films f ON n.film_id = f.id
+    LEFT JOIN members m ON n.member_id = m.id
     WHERE w.week_date = ?
   `, [weekDate], (err, week) => {
     if (err) {
@@ -47,23 +51,27 @@ router.get('/results/:date', (req, res) => {
       return res.status(404).send('Results not available for this week');
     }
     
-    // Get all nominations with their scores and vote breakdown
+    // Get all nominations with their scores and vote breakdown using JOINs
     req.db.all(`
-      SELECT n.id, n.film_title, n.film_year, n.poster_url, n.user_name as nominator
+      SELECT n.id, f.title as film_title, f.year as film_year, f.poster_url, 
+             m.name as nominator
       FROM nominations n
+      JOIN films f ON n.film_id = f.id
+      JOIN members m ON n.member_id = m.id
       WHERE n.week_id = ?
-      ORDER BY n.film_title
+      ORDER BY f.title
     `, [week.id], (err, nominations) => {
       if (err) {
         console.error(err);
         return res.status(500).send('Database error');
       }
 
-      // Get all votes for this week
+      // Get all votes for this week using JOINs
       req.db.all(`
-        SELECT user_name, votes_json 
-        FROM votes 
-        WHERE week_id = ?
+        SELECT m.name as user_name, v.nomination_id, v.points
+        FROM votes v
+        JOIN members m ON v.member_id = m.id
+        WHERE v.week_id = ?
       `, [week.id], (err, votes) => {
         if (err) {
           console.error(err);
@@ -76,21 +84,29 @@ router.get('/results/:date', (req, res) => {
           let voteBreakdown = [];
           let voterCount = 0;
 
-          votes.forEach(vote => {
-            try {
-              const voteData = JSON.parse(vote.votes_json);
-              const points = voteData[film.id] || 0;
-              if (points > 0) {
-                totalScore += points;
-                voteBreakdown.push({
-                  voter: vote.user_name,
-                  points: points,
-                  rank: nominations.length - points + 1
-                });
-                voterCount++;
-              }
-            } catch (e) {
-              console.error('Error parsing vote:', e);
+          // Group votes by voter for this film
+          const filmVotes = votes.filter(vote => vote.nomination_id === film.id);
+          const voterGroups = {};
+          
+          filmVotes.forEach(vote => {
+            if (!voterGroups[vote.user_name]) {
+              voterGroups[vote.user_name] = [];
+            }
+            voterGroups[vote.user_name].push(vote);
+          });
+
+          Object.entries(voterGroups).forEach(([voterName, voterVotes]) => {
+            const vote = voterVotes[0]; // Should only be one vote per voter per film
+            const points = vote.points;
+            
+            if (points > 0) {
+              totalScore += points;
+              voteBreakdown.push({
+                voter: voterName,
+                points: points,
+                rank: nominations.length - points + 1
+              });
+              voterCount++;
             }
           });
 
@@ -268,92 +284,34 @@ router.post('/calculate-results/:date', (req, res) => {
     
     console.log('Found week:', week); // Debug log
     
-    // Get all votes for this week
-    req.db.all(
-      "SELECT votes_json FROM votes WHERE week_id = ?",
-      [week.id],
-      (err, votes) => {
-        if (err) {
-          console.error('Error getting votes:', err);
-          return res.json({ success: false, error: 'Database error getting votes' });
-        }
-        
-        console.log('Found votes:', votes.length); // Debug log
-        
-        if (votes.length === 0) {
-          return res.json({ success: false, error: 'No votes found for this week' });
-        }
-        
-        // Calculate total points for each film
-        const filmScores = {};
-        
-        votes.forEach(vote => {
-          try {
-            const voteData = JSON.parse(vote.votes_json);
-            console.log('Processing vote:', voteData); // Debug log
-            
-            Object.entries(voteData).forEach(([filmId, points]) => {
-              filmScores[filmId] = (filmScores[filmId] || 0) + points;
-            });
-          } catch (e) {
-            console.error('Error parsing vote:', e);
-          }
-        });
-        
-        console.log('Film scores:', filmScores); // Debug log
-        
-        // Find winner
-        let winnerId = null;
-        let highestScore = 0;
-        
-        Object.entries(filmScores).forEach(([filmId, score]) => {
-          if (score > highestScore) {
-            highestScore = score;
-            winnerId = filmId;
-          }
-        });
-        
-        if (!winnerId) {
-          return res.json({ success: false, error: 'No winner could be determined' });
-        }
-        
-        console.log('Winner ID:', winnerId, 'Score:', highestScore); // Debug log
-        
-        // Get winner film details
-        req.db.get(
-          "SELECT film_title, film_year FROM nominations WHERE id = ?",
-          [winnerId],
-          (err, winnerFilm) => {
-            if (err || !winnerFilm) {
-              console.error('Winner film not found:', err);
-              return res.json({ success: false, error: 'Winner film not found' });
-            }
-            
-            console.log('Winner film:', winnerFilm); // Debug log
-            
-            // Update week to complete and store winner
-            req.db.run(
-              "UPDATE weeks SET phase = 'complete', winner_film_id = ?, winner_score = ? WHERE id = ?",
-              [winnerId, highestScore, week.id],
-              function(err) {
-                if (err) {
-                  console.error('Error saving results:', err);
-                  return res.json({ success: false, error: 'Failed to save results' });
-                }
-                
-                console.log('Results saved successfully!'); // Debug log
-                
-                res.json({ 
-                  success: true, 
-                  winner: `${winnerFilm.film_title} (${winnerFilm.film_year})`,
-                  score: highestScore
-                });
-              }
-            );
-          }
-        );
+    // Use the helper function to calculate results
+    req.calculateResults(week.id, (err, winner) => {
+      if (err) {
+        console.error('Error calculating results:', err);
+        return res.json({ success: false, error: err.message });
       }
-    );
+      
+      // Get winner film details
+      req.db.get(`
+        SELECT f.title, f.year 
+        FROM nominations n
+        JOIN films f ON n.film_id = f.id
+        WHERE n.id = ?
+      `, [winner.nomination_id], (err, winnerFilm) => {
+        if (err || !winnerFilm) {
+          console.error('Winner film not found:', err);
+          return res.json({ success: false, error: 'Winner film not found' });
+        }
+        
+        console.log('Results calculated successfully!'); // Debug log
+        
+        res.json({ 
+          success: true, 
+          winner: `${winnerFilm.title} (${winnerFilm.year})`,
+          score: winner.total_points
+        });
+      });
+    });
   });
 });
 

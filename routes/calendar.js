@@ -93,12 +93,14 @@ router.get('/', (req, res) => {
       let currentWeekFilms = [];
 
       if (currentWeek && currentWeek.id) {
-        // Get current week films with a simple query for now
+        // Get current week films with full details using JOINs
         req.db.all(`
-          SELECT id, week_id
-          FROM nominations 
-          WHERE week_id = ? 
-          ORDER BY nominated_at
+          SELECT n.id, n.week_id, f.title, f.year, f.poster_url, m.name as nominator
+          FROM nominations n
+          JOIN films f ON n.film_id = f.id
+          JOIN members m ON n.member_id = m.id
+          WHERE n.week_id = ? 
+          ORDER BY n.nominated_at
         `, [currentWeek.id], (err, films) => {
           if (!err) currentWeekFilms = films;
           

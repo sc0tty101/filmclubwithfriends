@@ -17,9 +17,15 @@ router.get('/vote/:date', (req, res) => {
       return res.status(404).send('Week not found or not in voting phase');
     }
     
-    // Get nominations for this week
-    req.db.all(
-      "SELECT * FROM nominations WHERE week_id = ? ORDER BY film_title",
+    // Get nominations for this week with film and member data
+    req.db.all(`
+      SELECT n.id, f.title as film_title, f.year as film_year, f.poster_url, 
+             m.name as user_name
+      FROM nominations n
+      JOIN films f ON n.film_id = f.id
+      JOIN members m ON n.member_id = m.id
+      WHERE n.week_id = ? 
+      ORDER BY f.title`,
       [week.id],
       (err, nominations) => {
         if (err) {
@@ -32,8 +38,11 @@ router.get('/vote/:date', (req, res) => {
         }
 
         // Get all votes to show progress
-        req.db.all(
-          "SELECT user_name FROM votes WHERE week_id = ?",
+        req.db.all(`
+          SELECT m.name as user_name 
+          FROM votes v
+          JOIN members m ON v.member_id = m.id
+          WHERE v.week_id = ?`,
           [week.id],
           (err, allVotes) => {
             if (err) {
@@ -42,71 +51,93 @@ router.get('/vote/:date', (req, res) => {
             }
 
             // Check if user already voted
-            req.db.get(
-              "SELECT * FROM votes WHERE week_id = ? AND user_name = ?",
-              [week.id, currentUser],
-              (err, existingVote) => {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).send('Database error');
-                }
+            req.getMember(currentUser, (err, member) => {
+              if (err || !member) {
+                console.error(err);
+                return res.status(500).send('Member lookup error');
+              }
 
-                const canVote = currentUser !== 'Unknown' && !existingVote;
-                const totalVoters = allVotes.length;
-                let userVotes = {};
-                
-                if (existingVote) {
-                  try {
-                    userVotes = JSON.parse(existingVote.votes_json);
-                  } catch (e) {
-                    console.error('Error parsing existing votes:', e);
+              req.db.get(`
+                SELECT v.voted_at
+                FROM votes v
+                WHERE v.week_id = ? AND v.member_id = ?
+                LIMIT 1`,
+                [week.id, member.id],
+                (err, existingVote) => {
+                  if (err) {
+                    console.error(err);
+                    return res.status(500).send('Database error');
                   }
-                }
 
-                res.send(`
-                  <!DOCTYPE html>
-                  <html>
-                  <head>
-                    <title>Vote - Film Club</title>
-                    <meta name="viewport" content="width=device-width, initial-scale=1">
-                    <link rel="stylesheet" href="/styles/main.css">
-                  </head>
-                  <body>
-                    <div class="container">
-                      <div class="header">
-                        <h1>🗳️ Vote for Films</h1>
-                        <p><strong>Week:</strong> ${new Date(weekDate).toLocaleDateString()}</p>
-                        <p><strong>Genre:</strong> ${week.genre}</p>
-                        <p><strong>Current User:</strong> ${currentUser}</p>
-                        
-                        <!-- Progress Indicator -->
-                        <div class="progress-indicator large">
-                          <div class="progress-step completed">
-                            <span class="step-icon">🎭</span>
-                            <span class="step-label">Genre Set</span>
+                  const canVote = currentUser !== 'Unknown' && !existingVote;
+                  const totalVoters = allVotes.length;
+                  let userVotes = {};
+                  
+                  if (existingVote) {
+                    // Get user's votes with points
+                    req.db.all(`
+                      SELECT nomination_id, points
+                      FROM votes 
+                      WHERE week_id = ? AND member_id = ?`,
+                      [week.id, member.id],
+                      (err, votes) => {
+                        if (!err && votes) {
+                          votes.forEach(vote => {
+                            userVotes[vote.nomination_id] = vote.points;
+                          });
+                        }
+                        renderVotingPage();
+                      }
+                    );
+                  } else {
+                    renderVotingPage();
+                  }
+
+                  function renderVotingPage() {
+                    res.send(`
+                      <!DOCTYPE html>
+                      <html>
+                      <head>
+                        <title>Vote - Film Club</title>
+                        <meta name="viewport" content="width=device-width, initial-scale=1">
+                        <link rel="stylesheet" href="/styles/main.css">
+                      </head>
+                      <body>
+                        <div class="container">
+                          <div class="header">
+                            <h1>🗳️ Vote for Films</h1>
+                            <p><strong>Week:</strong> ${new Date(weekDate).toLocaleDateString()}</p>
+                            <p><strong>Genre:</strong> ${week.genre}</p>
+                            <p><strong>Current User:</strong> ${currentUser}</p>
+                            
+                            <!-- Progress Indicator -->
+                            <div class="progress-indicator large">
+                              <div class="progress-step completed">
+                                <span class="step-icon">🎭</span>
+                                <span class="step-label">Genre Set</span>
+                              </div>
+                              <div class="progress-step completed">
+                                <span class="step-icon">🎬</span>
+                                <span class="step-label">Nominations</span>
+                              </div>
+                              <div class="progress-step active">
+                                <span class="step-icon">🗳️</span>
+                                <span class="step-label">Voting</span>
+                              </div>
+                              <div class="progress-step">
+                                <span class="step-icon">🏆</span>
+                                <span class="step-label">Results</span>
+                              </div>
+                            </div>
+                            
+                            <!-- Voting Progress -->
+                            <div class="voting-progress">
+                              <div class="vote-count">
+                                <span class="count-badge">${totalVoters}</span>
+                                <span class="progress-text">vote${totalVoters !== 1 ? 's' : ''} submitted</span>
+                              </div>
+                            </div>
                           </div>
-                          <div class="progress-step completed">
-                            <span class="step-icon">🎬</span>
-                            <span class="step-label">Nominations</span>
-                          </div>
-                          <div class="progress-step active">
-                            <span class="step-icon">🗳️</span>
-                            <span class="step-label">Voting</span>
-                          </div>
-                          <div class="progress-step">
-                            <span class="step-icon">🏆</span>
-                            <span class="step-label">Results</span>
-                          </div>
-                        </div>
-                        
-                        <!-- Voting Progress -->
-                        <div class="voting-progress">
-                          <div class="vote-count">
-                            <span class="count-badge">${totalVoters}</span>
-                            <span class="progress-text">vote${totalVoters !== 1 ? 's' : ''} submitted</span>
-                          </div>
-                        </div>
-                      </div>
 
                       <div class="card">
                         <div class="section-header">
@@ -373,9 +404,9 @@ router.get('/vote/:date', (req, res) => {
                   </html>
                 `);
               }
-            );
-          }
-        );
+            });
+          });
+        });
       }
     );
   });
@@ -397,35 +428,45 @@ router.post('/vote/:date', (req, res) => {
       return res.json({ success: false, error: 'Week not found' });
     }
     
-    // Check if user already voted
-    req.db.get(
-      "SELECT id FROM votes WHERE week_id = ? AND user_name = ?",
-      [week.id, userName],
-      (err, existing) => {
-        if (err) {
-          console.error(err);
-          return res.json({ success: false, error: 'Database error' });
-        }
-        
-        if (existing) {
-          return res.json({ success: false, error: 'You have already voted for this week' });
-        }
-        
-        // Insert vote
-        req.db.run(
-          "INSERT INTO votes (week_id, user_name, votes_json) VALUES (?, ?, ?)",
-          [week.id, userName, JSON.stringify(votes)],
-          function(err) {
+    // Get member ID
+    req.getMember(userName, (err, member) => {
+      if (err || !member) {
+        console.error(err);
+        return res.json({ success: false, error: 'Member not found' });
+      }
+      
+      // Check if user already voted
+      req.db.get(
+        "SELECT id FROM votes WHERE week_id = ? AND member_id = ?",
+        [week.id, member.id],
+        (err, existing) => {
+          if (err) {
+            console.error(err);
+            return res.json({ success: false, error: 'Database error' });
+          }
+          
+          if (existing) {
+            return res.json({ success: false, error: 'You have already voted for this week' });
+          }
+          
+          // Convert votes object to ranked nominations array
+          const rankedNominations = Object.entries(votes).map(([nominationId, points]) => ({
+            nominationId: parseInt(nominationId),
+            rank: Object.keys(votes).length - points + 1
+          }));
+          
+          // Use the helper function to submit votes
+          req.submitVotes(week.id, member.id, rankedNominations, (err) => {
             if (err) {
               console.error(err);
               return res.json({ success: false, error: 'Failed to save vote' });
             }
             
             res.json({ success: true });
-          }
-        );
-      }
-    );
+          });
+        }
+      );
+    });
   });
 });
 
