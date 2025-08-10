@@ -1,4 +1,4 @@
-// routes/calendar.js
+// routes/calendar.js - FIXED VERSION
 const express = require('express');
 const router = express.Router();
 
@@ -22,20 +22,25 @@ class CalendarView {
         if (err) return reject(err);
         data.members = members;
 
-        // Get weeks with all their data in one query
+        // FIXED: Updated query to match your actual schema
         this.db.all(`
           SELECT 
             w.*,
+            g.name as genre,
             COUNT(DISTINCT n.id) as nomination_count,
             COUNT(DISTINCT v.id) as vote_count,
-            winner.film_title as winner_title,
-            winner.film_year as winner_year,
-            winner.user_name as winner_nominator,
-            winner.poster_url as winner_poster
+            wf.title as winner_title,
+            wf.year as winner_year,
+            wm.name as winner_nominator,
+            wf.poster_url as winner_poster
           FROM weeks w
+          LEFT JOIN genres g ON w.genre_id = g.id
           LEFT JOIN nominations n ON w.id = n.week_id
           LEFT JOIN votes v ON w.id = v.week_id
-          LEFT JOIN nominations winner ON w.winner_film_id = winner.id
+          LEFT JOIN results r ON w.id = r.week_id
+          LEFT JOIN nominations wn ON r.winning_nomination_id = wn.id
+          LEFT JOIN films wf ON wn.film_id = wf.id
+          LEFT JOIN members wm ON wn.member_id = wm.id
           GROUP BY w.id
           ORDER BY w.week_date DESC
         `, (err, weeks) => {
@@ -45,10 +50,20 @@ class CalendarView {
           // Get current week films if exists
           const currentWeek = this.getCurrentWeek(weeks);
           if (currentWeek && currentWeek.id) {
+            // FIXED: Updated to join with films and members tables
             this.db.all(`
-              SELECT * FROM nominations 
-              WHERE week_id = ? 
-              ORDER BY nominated_at
+              SELECT 
+                n.*,
+                f.title as film_title,
+                f.year as film_year,
+                f.poster_url,
+                f.backdrop_url,
+                m.name as user_name
+              FROM nominations n
+              LEFT JOIN films f ON n.film_id = f.id
+              LEFT JOIN members m ON n.member_id = m.id
+              WHERE n.week_id = ? 
+              ORDER BY n.nominated_at
             `, [currentWeek.id], (err, films) => {
               if (!err) data.currentWeekFilms = films;
               resolve(data);
@@ -136,7 +151,7 @@ router.get('/', async (req, res) => {
     
   } catch (error) {
     console.error('Calendar error:', error);
-    res.status(500).send('Error loading calendar');
+    res.status(500).send('Error loading calendar: ' + error.message);
   }
 });
 
