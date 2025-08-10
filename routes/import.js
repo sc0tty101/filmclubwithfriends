@@ -1,3 +1,6 @@
+const express = require('express');
+const router = express.Router();
+
 // ... [top unchanged] ...
 const { getOrCreateFilm } = require('../database/setup');
 // ... [keep previous helper functions] ...
@@ -78,3 +81,5 @@ router.post('/admin/import-historical', (req, res) => {
 });
 
 // ... rest unchanged ...
+
+module.exports = router;
