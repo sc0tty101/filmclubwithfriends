@@ -109,36 +109,98 @@ router.get('/set-genre/:date', (req, res) => {
 // HANDLE GENRE SETTING
 router.post('/set-genre/:date', (req, res) => {
   const weekDate = req.params.date;
-  // Priority: custom genre first, then dropdown selection
-  const genre = (req.body.customGenre && req.body.customGenre.trim()) || req.body.genre;
-  const currentUser = 'Unknown'; // We'll improve this later
+  const genreName = (req.body.customGenre && req.body.customGenre.trim()) || req.body.genre;
+  const currentUser = req.query.user || 'Unknown'; // Get user from query params
   
-  console.log('Genre setting request:', { customGenre: req.body.customGenre, dropdownGenre: req.body.genre, finalGenre: genre }); // Debug log
+  console.log('Genre setting request:', { customGenre: req.body.customGenre, dropdownGenre: req.body.genre, finalGenre: genreName });
   
-  if (!genre) {
+  if (!genreName) {
     return res.status(400).send('Genre is required - please select from dropdown or enter custom genre');
   }
 
-  // Insert or update week in database
-  req.db.run(
-    `INSERT OR REPLACE INTO weeks (week_date, genre, genre_source, phase, created_by) 
-     VALUES (?, ?, 'user', 'nomination', ?)`,
-    [weekDate, genre, currentUser],
-    function(err) {
+  // First, get the member ID for the setter
+  req.db.get("SELECT id FROM members WHERE name = ?", [currentUser], (err, member) => {
+    if (err) {
+      console.error('Error finding member:', err);
+    }
+    
+    const setterId = member ? member.id : null;
+
+    // Get or create the genre
+    req.db.get("SELECT id FROM genres WHERE name = ?", [genreName], (err, genre) => {
       if (err) {
         console.error(err);
         return res.status(500).send('Database error');
       }
+
+      let genreId;
       
-      console.log('Genre set successfully:', genre); // Debug log
-      res.redirect('/');
-    }
-  );
+      if (genre) {
+        genreId = genre.id;
+        // Update times_used counter
+        req.db.run("UPDATE genres SET times_used = times_used + 1 WHERE id = ?", [genreId]);
+        insertOrUpdateWeek();
+      } else {
+        // Create new genre if it doesn't exist
+        req.db.run("INSERT INTO genres (name, times_used) VALUES (?, 1)", [genreName], function(err) {
+          if (err) {
+            console.error(err);
+            return res.status(500).send('Failed to create genre');
+          }
+          genreId = this.lastID;
+          insertOrUpdateWeek();
+        });
+      }
+
+      function insertOrUpdateWeek() {
+        // Check if week already exists
+        req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, existingWeek) => {
+          if (err) {
+            console.error(err);
+            return res.status(500).send('Database error');
+          }
+
+          if (existingWeek) {
+            // Update existing week
+            req.db.run(
+              `UPDATE weeks SET genre_id = ?, genre_setter_id = ?, phase = 'nomination', phase_changed_at = CURRENT_TIMESTAMP 
+               WHERE week_date = ?`,
+              [genreId, setterId, weekDate],
+              function(err) {
+                if (err) {
+                  console.error(err);
+                  return res.status(500).send('Database error');
+                }
+                console.log('Week updated with genre:', genreName);
+                res.redirect('/');
+              }
+            );
+          } else {
+            // Insert new week
+            req.db.run(
+              `INSERT INTO weeks (week_date, genre_id, genre_setter_id, phase) 
+               VALUES (?, ?, ?, 'nomination')`,
+              [weekDate, genreId, setterId],
+              function(err) {
+                if (err) {
+                  console.error(err);
+                  return res.status(500).send('Database error');
+                }
+                console.log('Week created with genre:', genreName);
+                res.redirect('/');
+              }
+            );
+          }
+        });
+      }
+    });
+  });
 });
 
 // RANDOM GENRE ENDPOINT
 router.get('/random-genre/:date', (req, res) => {
   const weekDate = req.params.date;
+  const currentUser = req.query.user || 'Unknown';
   
   // Get genres from database and pick random one
   getGenres((err, genres) => {
@@ -151,20 +213,62 @@ router.get('/random-genre/:date', (req, res) => {
       return res.status(400).send('No genres available. Please add some genres first.');
     }
 
-    const randomGenre = genres[Math.floor(Math.random() * genres.length)].name;
+    const randomGenre = genres[Math.floor(Math.random() * genres.length)];
     
-    req.db.run(
-      `UPDATE weeks SET genre = ?, genre_source = 'random', phase = 'nomination' 
-       WHERE week_date = ?`,
-      [randomGenre, weekDate],
-      function(err) {
+    // Get member ID for setter
+    req.db.get("SELECT id FROM members WHERE name = ?", [currentUser], (err, member) => {
+      if (err) {
+        console.error('Error finding member:', err);
+      }
+      
+      const setterId = member ? member.id : null;
+
+      // Check if week exists
+      req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, existingWeek) => {
         if (err) {
           console.error(err);
           return res.status(500).send('Database error');
         }
-        res.redirect('/');
-      }
-    );
+
+        if (existingWeek) {
+          // Update existing week
+          req.db.run(
+            `UPDATE weeks SET genre_id = ?, genre_setter_id = ?, phase = 'nomination', phase_changed_at = CURRENT_TIMESTAMP 
+             WHERE week_date = ?`,
+            [randomGenre.id, setterId, weekDate],
+            function(err) {
+              if (err) {
+                console.error(err);
+                return res.status(500).send('Database error');
+              }
+              
+              // Update genre usage count
+              req.db.run("UPDATE genres SET times_used = times_used + 1 WHERE id = ?", [randomGenre.id]);
+              
+              res.redirect('/');
+            }
+          );
+        } else {
+          // Create new week
+          req.db.run(
+            `INSERT INTO weeks (week_date, genre_id, genre_setter_id, phase) 
+             VALUES (?, ?, ?, 'nomination')`,
+            [weekDate, randomGenre.id, setterId],
+            function(err) {
+              if (err) {
+                console.error(err);
+                return res.status(500).send('Database error');
+              }
+              
+              // Update genre usage count
+              req.db.run("UPDATE genres SET times_used = times_used + 1 WHERE id = ?", [randomGenre.id]);
+              
+              res.redirect('/');
+            }
+          );
+        }
+      });
+    });
   });
 });
 
