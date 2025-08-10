@@ -1,22 +1,27 @@
-// routes/calendar.js - SIMPLIFIED VERSION
+// routes/calendar.js - FIXED VERSION
 const express = require('express');
 const router = express.Router();
 
 router.get('/', (req, res) => {
   // Get members first
-  req.db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
+  req.db.all("SELECT id, name FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
     if (err) {
       console.error('Members error:', err);
       return res.status(500).send('Error loading members: ' + err.message);
     }
 
-    // Get weeks with basic data
+    // Get weeks with proper joins to genres
     req.db.all(`
       SELECT 
-        w.*,
+        w.id,
+        w.week_date,
+        w.genre_id,
+        w.phase,
+        g.name as genre_name,
         COUNT(DISTINCT n.id) as nomination_count,
         COUNT(DISTINCT v.id) as vote_count
       FROM weeks w
+      LEFT JOIN genres g ON w.genre_id = g.id
       LEFT JOIN nominations n ON w.id = n.week_id
       LEFT JOIN votes v ON w.id = v.week_id
       GROUP BY w.id
@@ -36,12 +41,6 @@ router.get('/', (req, res) => {
 
       function formatDate(date) {
         return date.toISOString().split('T')[0];
-      }
-
-      function getCurrentWeek(weeks) {
-        const monday = getMondayOfWeek(new Date());
-        const mondayStr = formatDate(monday);
-        return weeks.find(w => w.week_date === mondayStr);
       }
 
       function generateWeekSlots(existingWeeks) {
@@ -82,18 +81,24 @@ router.get('/', (req, res) => {
         future: weekSlots.filter(w => !w.isPast && !w.isCurrent && !w.isNearFuture)
       };
 
-      // Get current week films (joined to films and members)
+      // Get current week films if exists
       const currentWeek = groupedWeeks.current;
       let currentWeekFilms = [];
 
       if (currentWeek && currentWeek.id) {
         req.db.all(
-          `SELECT n.id, f.title as film_title, f.year as film_year, f.poster_url, f.backdrop_url, m.name as user_name
-             FROM nominations n
-             JOIN films f ON n.film_id = f.id
-             JOIN members m ON n.member_id = m.id
-            WHERE n.week_id = ?
-            ORDER BY n.nominated_at`,
+          `SELECT 
+            n.id, 
+            f.title as film_title, 
+            f.year as film_year, 
+            f.poster_url, 
+            f.backdrop_url, 
+            m.name as user_name
+          FROM nominations n
+          JOIN films f ON n.film_id = f.id
+          JOIN members m ON n.member_id = m.id
+          WHERE n.week_id = ?
+          ORDER BY n.nominated_at`,
           [currentWeek.id],
           (err, films) => {
             if (!err) currentWeekFilms = films;
@@ -116,4 +121,4 @@ router.get('/', (req, res) => {
   });
 });
 
-module.exports = router;
+module.expor
