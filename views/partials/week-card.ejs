@@ -1,7 +1,26 @@
 <div class="week-card">
-  <h3>Week <%= week.id %></h3>
-  <p>Date: <%= week.week_date %></p>
-  <p>Genre: <%= week.genre_name %></p>
-  <p>Phase: <%= week.phase %></p>
-  <!-- Add more week details as needed -->
+  <div class="week-info">
+    <h3><%= week.displayDate %></h3>
+    <% if (week.genre_name) { %>
+      <div class="genre-info">
+        Genre: <strong><%= week.genre_name %></strong>
+      </div>
+    <% } %>
+    <div class="week-status">
+      <span class="status-text phase-<%= week.phase || 'planning' %>">
+        <%= week.phase || 'Planning' %>
+      </span>
+    </div>
+  </div>
+  <div class="actions">
+    <% if (!week.id || week.phase === 'planning') { %>
+      <a href="/set-genre/<%= week.date %>" class="btn btn-primary">Set Genre</a>
+    <% } else if (week.phase === 'nomination') { %>
+      <a href="/nominate/<%= week.date %>" class="btn btn-success">Nominate</a>
+    <% } else if (week.phase === 'voting') { %>
+      <a href="/vote/<%= week.date %>" class="btn btn-warning">Vote</a>
+    <% } else if (week.phase === 'complete') { %>
+      <a href="/results/<%= week.date %>" class="btn btn-secondary">Results</a>
+    <% } %>
+  </div>
 </div>
