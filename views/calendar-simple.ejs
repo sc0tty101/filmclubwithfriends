@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Film Club Calendar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; }
+    .card { border: 1px solid #ccc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .week-item { margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 4px; }
+    .members-list { display: flex; gap: 10px; margin: 20px 0; }
+    .member-btn { padding: 8px 16px; border: 1px solid #ccc; border-radius: 4px; background: white; cursor: pointer; }
+    .film-item { margin: 5px 0; padding: 5px; background: white; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>🎬 Film Club</h1>
+  
+  <div class="card">
+    <h2>Members</h2>
+    <div class="members-list">
+      <% members.forEach(member => { %>
+        <button class="member-btn" onclick="setCurrentUser('<%= member.name %>')">
+          <%= member.name %>
+        </button>
+      <% }) %>
+    </div>
+    <p>Current user: <span id="currentUser">Unknown</span></p>
+  </div>
+
+  <div class="card">
+    <h2>Current Week</h2>
+    <% if (weeks.current) { %>
+      <div class="week-item">
+        <h3>Week of <%= weeks.current.displayDate %></h3>
+        <p>Phase: <strong><%= weeks.current.phase || 'planning' %></strong></p>
+        <p>Nominations: <%= weeks.current.nomination_count || 0 %></p>
+        <p>Votes: <%= weeks.current.vote_count || 0 %></p>
+        
+        <% if (currentWeekFilms && currentWeekFilms.length > 0) { %>
+          <h4>Nominated Films:</h4>
+          <% currentWeekFilms.forEach(film => { %>
+            <div class="film-item">
+              <strong><%= film.title %> (<%= film.year %>)</strong> 
+              - nominated by <%= film.nominator %>
+            </div>
+          <% }) %>
+        <% } else { %>
+          <p>No films nominated yet.</p>
+        <% } %>
+        
+        <% if (weeks.current.id) { %>
+          <p>
+            <a href="/nominate/<%= weeks.current.date %>?user=" id="nominateLink">🎬 Nominate Film</a> |
+            <a href="/vote/<%= weeks.current.date %>?user=" id="voteLink">🗳️ Vote</a> |
+            <a href="/results/<%= weeks.current.date %>">🏆 Results</a>
+          </p>
+        <% } %>
+      </div>
+    <% } else { %>
+      <p>No current week found.</p>
+    <% } %>
+  </div>
+
+  <div class="card">
+    <h2>Recent Weeks</h2>
+    <% if (weeks.past && weeks.past.length > 0) { %>
+      <% weeks.past.slice(-5).forEach(week => { %>
+        <div class="week-item">
+          <h4>Week of <%= week.displayDate %></h4>
+          <p>Phase: <%= week.phase || 'unknown' %> | 
+             Nominations: <%= week.nomination_count || 0 %> | 
+             Votes: <%= week.vote_count || 0 %></p>
+        </div>
+      <% }) %>
+    <% } else { %>
+      <p>No past weeks found.</p>
+    <% } %>
+  </div>
+
+  <script>
+    function setCurrentUser(name) {
+      localStorage.setItem('currentUser', name);
+      document.getElementById('currentUser').textContent = name;
+      
+      // Update links
+      const nominateLink = document.getElementById('nominateLink');
+      const voteLink = document.getElementById('voteLink');
+      if (nominateLink) nominateLink.href = nominateLink.href.split('?')[0] + '?user=' + encodeURIComponent(name);
+      if (voteLink) voteLink.href = voteLink.href.split('?')[0] + '?user=' + encodeURIComponent(name);
+    }
+    
+    // Load saved user
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      setCurrentUser(savedUser);
+    }
+  </script>
+</body>
+</html>

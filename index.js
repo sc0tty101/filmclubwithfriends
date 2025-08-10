@@ -9,7 +9,7 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
 // Import database
-const db = require('./database/setup');
+const { db } = require('./database/setup');
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));

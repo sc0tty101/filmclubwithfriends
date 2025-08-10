@@ -113,7 +113,7 @@ router.get('/', (req, res) => {
 
       function renderCalendar() {
         // Render with the template
-        res.render('calendar', {
+        res.render('calendar-simple', {
           members: members || [],
           weeks: groupedWeeks,
           currentWeekFilms: currentWeekFilms,
