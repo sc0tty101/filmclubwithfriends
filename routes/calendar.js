@@ -2,7 +2,6 @@
 const express = require('express');
 const router = express.Router();
 
-// Route handler - simplified without class
 router.get('/', (req, res) => {
   // Get members first
   req.db.all("SELECT name FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
@@ -28,7 +27,6 @@ router.get('/', (req, res) => {
         return res.status(500).send('Error loading weeks: ' + err.message);
       }
 
-      // Helper functions
       function getMondayOfWeek(date) {
         const d = new Date(date);
         const day = d.getDay();
@@ -46,24 +44,21 @@ router.get('/', (req, res) => {
         return weeks.find(w => w.week_date === mondayStr);
       }
 
-      // Generate week slots
       function generateWeekSlots(existingWeeks) {
         const slots = [];
         const currentMonday = getMondayOfWeek(new Date());
-        
-        // Generate 52 weeks (full year ahead)
+
         for (let i = -4; i < 48; i++) {
           const weekDate = new Date(currentMonday);
           weekDate.setDate(currentMonday.getDate() + (i * 7));
           const weekDateStr = formatDate(weekDate);
-          
-          // Find existing week data
+
           const existingWeek = existingWeeks.find(w => w.week_date === weekDateStr);
-          
+
           slots.push({
             date: weekDateStr,
-            displayDate: weekDate.toLocaleDateString('en-US', { 
-              month: 'short', 
+            displayDate: weekDate.toLocaleDateString('en-US', {
+              month: 'short',
               day: 'numeric',
               year: weekDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
             }),
@@ -74,13 +69,12 @@ router.get('/', (req, res) => {
             ...existingWeek
           });
         }
-        
+
         return slots;
       }
 
       const weekSlots = generateWeekSlots(weeks);
-      
-      // Group weeks for display
+
       const groupedWeeks = {
         past: weekSlots.filter(w => w.isPast),
         current: weekSlots.find(w => w.isCurrent),
@@ -88,29 +82,29 @@ router.get('/', (req, res) => {
         future: weekSlots.filter(w => !w.isPast && !w.isCurrent && !w.isNearFuture)
       };
 
-      // Get current week films (simplified)
+      // Get current week films (joined to films and members)
       const currentWeek = groupedWeeks.current;
       let currentWeekFilms = [];
 
       if (currentWeek && currentWeek.id) {
-        // Get current week films with a simple query for now
-        req.db.all(`
-          SELECT id, week_id
-          FROM nominations 
-          WHERE week_id = ? 
-          ORDER BY nominated_at
-        `, [currentWeek.id], (err, films) => {
-          if (!err) currentWeekFilms = films;
-          
-          // Render the template
-          renderCalendar();
-        });
+        req.db.all(
+          `SELECT n.id, f.title as film_title, f.year as film_year, f.poster_url, f.backdrop_url, m.name as user_name
+             FROM nominations n
+             JOIN films f ON n.film_id = f.id
+             JOIN members m ON n.member_id = m.id
+            WHERE n.week_id = ?
+            ORDER BY n.nominated_at`,
+          [currentWeek.id],
+          (err, films) => {
+            if (!err) currentWeekFilms = films;
+            renderCalendar();
+          }
+        );
       } else {
         renderCalendar();
       }
 
       function renderCalendar() {
-        // Render with the template
         res.render('calendar', {
           members: members || [],
           weeks: groupedWeeks,
