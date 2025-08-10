@@ -1,6 +1,7 @@
 // routes/import.js
 const express = require('express');
 const router = express.Router();
+const { getOrCreateFilm, getMember } = require('../database/setup');
 
 // Helper function to parse date string like "6 May" or "13 May" with year
 function parseDate(dateStr, year) {
@@ -834,99 +835,148 @@ router.post('/admin/import-historical', (req, res) => {
               // Extract year from film title using improved logic
               const { title: filmTitle, year: filmYear } = extractYearFromTitle(nom.film);
               
-              if (fetchTMDB) {
-                // Enhanced import with TMDB data
-                try {
-                  const tmdbData = await enhanceWithTMDB(filmTitle, filmYear);
-                  
-                  req.db.run(
-                    `INSERT INTO nominations 
-                     (week_id, user_name, film_title, film_year, poster_url, backdrop_url, 
-                      tmdb_id, vote_average, release_date, runtime, overview, director, tmdb_genres, nominated_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-                    [
-                      weekId, nom.nominator, filmTitle, filmYear,
-                      tmdbData.poster_url || '', tmdbData.backdrop_url || '', tmdbData.tmdb_id || null,
-                      tmdbData.vote_average || 0, tmdbData.release_date || '', tmdbData.runtime || 0,
-                      tmdbData.overview || '', tmdbData.director || '', tmdbData.tmdb_genres || ''
-                    ],
-                    function(err) {
-                      if (err) {
-                        errors.push(`Failed to import ${nom.film}: ${err.message}`);
-                      } else {
-                        nominationsImported++;
-                        if (Object.keys(tmdbData).length > 0) {
-                          tmdbEnhanced++;
-                        }
-                        
-                        // If this is the winner, update the week
-                        if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
-                          req.db.run(
-                            "UPDATE weeks SET winner_film_id = ?, winner_score = ? WHERE id = ?",
-                            [this.lastID, nom.voteScore, weekId]
-                          );
-                        }
-                      }
-                      
-                      nomIndex++;
-                      processNomination();
-                    }
-                  );
-                } catch (error) {
-                  console.error(`TMDB enhancement failed for ${filmTitle}:`, error);
-                  // Fall back to basic import without TMDB data
-                  req.db.run(
-                    `INSERT INTO nominations 
-                     (week_id, user_name, film_title, film_year, nominated_at) 
-                     VALUES (?, ?, ?, ?, datetime('now'))`,
-                    [weekId, nom.nominator, filmTitle, filmYear],
-                    function(err) {
-                      if (err) {
-                        errors.push(`Failed to import ${nom.film}: ${err.message}`);
-                      } else {
-                        nominationsImported++;
-                        
-                        // If this is the winner, update the week
-                        if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
-                          req.db.run(
-                            "UPDATE weeks SET winner_film_id = ?, winner_score = ? WHERE id = ?",
-                            [this.lastID, nom.voteScore, weekId]
-                          );
-                        }
-                      }
-                      
-                      nomIndex++;
-                      processNomination();
-                    }
-                  );
+              // Get member ID first
+              getMember(nom.nominator, (err, member) => {
+                if (err || !member) {
+                  errors.push(`Member ${nom.nominator} not found for film ${filmTitle}`);
+                  nomIndex++;
+                  processNomination();
+                  return;
                 }
-              } else {
-                // Regular import without TMDB data
-                req.db.run(
-                  `INSERT INTO nominations 
-                   (week_id, user_name, film_title, film_year, nominated_at) 
-                   VALUES (?, ?, ?, ?, datetime('now'))`,
-                  [weekId, nom.nominator, filmTitle, filmYear],
-                  function(err) {
-                    if (err) {
-                      errors.push(`Failed to import ${nom.film}: ${err.message}`);
-                    } else {
-                      nominationsImported++;
-                      
-                      // If this is the winner, update the week
-                      if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
-                        req.db.run(
-                          "UPDATE weeks SET winner_film_id = ?, winner_score = ? WHERE id = ?",
-                          [this.lastID, nom.voteScore, weekId]
-                        );
+                
+                if (fetchTMDB) {
+                  // Enhanced import with TMDB data
+                  enhanceWithTMDB(filmTitle, filmYear).then(tmdbData => {
+                    const filmData = {
+                      tmdb_id: tmdbData.tmdb_id || null,
+                      title: filmTitle,
+                      year: filmYear,
+                      director: tmdbData.director || null,
+                      runtime: tmdbData.runtime || null,
+                      poster_url: tmdbData.poster_url || null,
+                      backdrop_url: tmdbData.backdrop_url || null,
+                      tmdb_rating: tmdbData.vote_average || null,
+                      overview: tmdbData.overview || null,
+                      genres: tmdbData.tmdb_genres || null
+                    };
+                    
+                    getOrCreateFilm(filmData, (err, filmId) => {
+                      if (err) {
+                        errors.push(`Failed to create film ${filmTitle}: ${err.message}`);
+                        nomIndex++;
+                        processNomination();
+                        return;
                       }
+                      
+                      req.db.run(
+                        `INSERT INTO nominations (week_id, film_id, member_id, nominated_at) 
+                         VALUES (?, ?, ?, datetime('now'))`,
+                        [weekId, filmId, member.id],
+                        function(err) {
+                          if (err) {
+                            errors.push(`Failed to import nomination for ${filmTitle}: ${err.message}`);
+                          } else {
+                            nominationsImported++;
+                            if (Object.keys(tmdbData).length > 0) {
+                              tmdbEnhanced++;
+                            }
+                            
+                            // If this is the winner, update the results table
+                            if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
+                              req.db.run(
+                                "INSERT OR REPLACE INTO results (week_id, winning_nomination_id, total_points, vote_count) VALUES (?, ?, ?, 1)",
+                                [weekId, this.lastID, nom.voteScore]
+                              );
+                            }
+                          }
+                          
+                          nomIndex++;
+                          processNomination();
+                        }
+                      );
+                    });
+                  }).catch(error => {
+                    console.error(`TMDB enhancement failed for ${filmTitle}:`, error);
+                    // Fall back to basic import without TMDB data
+                    const filmData = {
+                      title: filmTitle,
+                      year: filmYear
+                    };
+                    
+                    getOrCreateFilm(filmData, (err, filmId) => {
+                      if (err) {
+                        errors.push(`Failed to create film ${filmTitle}: ${err.message}`);
+                        nomIndex++;
+                        processNomination();
+                        return;
+                      }
+                      
+                      req.db.run(
+                        `INSERT INTO nominations (week_id, film_id, member_id, nominated_at) 
+                         VALUES (?, ?, ?, datetime('now'))`,
+                        [weekId, filmId, member.id],
+                        function(err) {
+                          if (err) {
+                            errors.push(`Failed to import nomination for ${filmTitle}: ${err.message}`);
+                          } else {
+                            nominationsImported++;
+                            
+                            // If this is the winner, update the results table
+                            if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
+                              req.db.run(
+                                "INSERT OR REPLACE INTO results (week_id, winning_nomination_id, total_points, vote_count) VALUES (?, ?, ?, 1)",
+                                [weekId, this.lastID, nom.voteScore]
+                              );
+                            }
+                          }
+                          
+                          nomIndex++;
+                          processNomination();
+                        }
+                      );
+                    });
+                  });
+                } else {
+                  // Regular import without TMDB data
+                  const filmData = {
+                    title: filmTitle,
+                    year: filmYear
+                  };
+                  
+                  getOrCreateFilm(filmData, (err, filmId) => {
+                    if (err) {
+                      errors.push(`Failed to create film ${filmTitle}: ${err.message}`);
+                      nomIndex++;
+                      processNomination();
+                      return;
                     }
                     
-                    nomIndex++;
-                    processNomination();
-                  }
-                );
-              }
+                    req.db.run(
+                      `INSERT INTO nominations (week_id, film_id, member_id, nominated_at) 
+                       VALUES (?, ?, ?, datetime('now'))`,
+                      [weekId, filmId, member.id],
+                      function(err) {
+                        if (err) {
+                          errors.push(`Failed to import nomination for ${filmTitle}: ${err.message}`);
+                        } else {
+                          nominationsImported++;
+                          
+                          // If this is the winner, update the results table
+                          if (winner && nom.film === winner.film && nom.nominator === winner.nominator) {
+                            req.db.run(
+                              "INSERT OR REPLACE INTO results (week_id, winning_nomination_id, total_points, vote_count) VALUES (?, ?, ?, 1)",
+                              [weekId, this.lastID, nom.voteScore]
+                            );
+                          }
+                        }
+                        
+                        nomIndex++;
+                        processNomination();
+                      }
+                    );
+                  });
+                }
+              });
             }
             
             processNomination();

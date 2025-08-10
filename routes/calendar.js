@@ -11,12 +11,12 @@ router.get('/', (req, res) => {
       return res.status(500).send('Error loading members: ' + err.message);
     }
 
-    // Get weeks with basic data
+    // Get weeks with basic data using normalized schema
     req.db.all(`
       SELECT 
         w.*,
         COUNT(DISTINCT n.id) as nomination_count,
-        COUNT(DISTINCT v.id) as vote_count
+        COUNT(DISTINCT v.member_id) as vote_count
       FROM weeks w
       LEFT JOIN nominations n ON w.id = n.week_id
       LEFT JOIN votes v ON w.id = v.week_id
@@ -93,12 +93,14 @@ router.get('/', (req, res) => {
       let currentWeekFilms = [];
 
       if (currentWeek && currentWeek.id) {
-        // Get current week films with a simple query for now
+        // Get current week films with normalized schema
         req.db.all(`
-          SELECT id, week_id
-          FROM nominations 
-          WHERE week_id = ? 
-          ORDER BY nominated_at
+          SELECT n.id, n.week_id, f.title, f.year, f.poster_url, m.name as nominator
+          FROM nominations n
+          JOIN films f ON n.film_id = f.id
+          JOIN members m ON n.member_id = m.id
+          WHERE n.week_id = ? 
+          ORDER BY n.nominated_at
         `, [currentWeek.id], (err, films) => {
           if (!err) currentWeekFilms = films;
           

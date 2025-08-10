@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { submitVotes, getMember } = require('../database/setup');
 
 // ENHANCED VOTING PAGE - Replace the GET /vote/:date route in routes/votes.js
 router.get('/vote/:date', (req, res) => {
@@ -17,9 +18,14 @@ router.get('/vote/:date', (req, res) => {
       return res.status(404).send('Week not found or not in voting phase');
     }
     
-    // Get nominations for this week
+    // Get nominations for this week with film info
     req.db.all(
-      "SELECT * FROM nominations WHERE week_id = ? ORDER BY film_title",
+      `SELECT n.id, f.title as film_title, f.year as film_year, f.poster_url,
+              m.name as user_name
+       FROM nominations n
+       JOIN films f ON n.film_id = f.id
+       JOIN members m ON n.member_id = m.id  
+       WHERE n.week_id = ? ORDER BY f.title`,
       [week.id],
       (err, nominations) => {
         if (err) {
@@ -31,9 +37,12 @@ router.get('/vote/:date', (req, res) => {
           return res.send('No nominations found for this week.');
         }
 
-        // Get all votes to show progress
+        // Get all votes to show progress  
         req.db.all(
-          "SELECT user_name FROM votes WHERE week_id = ?",
+          `SELECT DISTINCT m.name as user_name 
+           FROM votes v
+           JOIN members m ON v.member_id = m.id
+           WHERE v.week_id = ?`,
           [week.id],
           (err, allVotes) => {
             if (err) {
@@ -43,7 +52,10 @@ router.get('/vote/:date', (req, res) => {
 
             // Check if user already voted
             req.db.get(
-              "SELECT * FROM votes WHERE week_id = ? AND user_name = ?",
+              `SELECT v.id 
+               FROM votes v 
+               JOIN members m ON v.member_id = m.id
+               WHERE v.week_id = ? AND m.name = ?`,
               [week.id, currentUser],
               (err, existingVote) => {
                 if (err) {
@@ -56,12 +68,27 @@ router.get('/vote/:date', (req, res) => {
                 let userVotes = {};
                 
                 if (existingVote) {
-                  try {
-                    userVotes = JSON.parse(existingVote.votes_json);
-                  } catch (e) {
-                    console.error('Error parsing existing votes:', e);
-                  }
+                  // Get user's votes in the new format
+                  req.db.all(
+                    `SELECT nomination_id, points, rank
+                     FROM votes v
+                     JOIN members m ON v.member_id = m.id  
+                     WHERE v.week_id = ? AND m.name = ?`,
+                    [week.id, currentUser],
+                    (err, votes) => {
+                      if (!err && votes) {
+                        votes.forEach(vote => {
+                          userVotes[vote.nomination_id] = vote.points;
+                        });
+                      }
+                      renderVotingPage();
+                    }
+                  );
+                } else {
+                  renderVotingPage();
                 }
+                
+                function renderVotingPage() {
 
                 res.send(`
                   <!DOCTYPE html>
@@ -372,6 +399,7 @@ router.get('/vote/:date', (req, res) => {
                   </body>
                   </html>
                 `);
+                }
               }
             );
           }
@@ -390,42 +418,54 @@ router.post('/vote/:date', (req, res) => {
     return res.json({ success: false, error: 'User name and votes are required' });
   }
   
-  // Get week ID
+  // Get week ID and member ID
   req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
     if (err || !week) {
       console.error(err);
       return res.json({ success: false, error: 'Week not found' });
     }
     
-    // Check if user already voted
-    req.db.get(
-      "SELECT id FROM votes WHERE week_id = ? AND user_name = ?",
-      [week.id, userName],
-      (err, existing) => {
-        if (err) {
-          console.error(err);
-          return res.json({ success: false, error: 'Database error' });
-        }
-        
-        if (existing) {
-          return res.json({ success: false, error: 'You have already voted for this week' });
-        }
-        
-        // Insert vote
-        req.db.run(
-          "INSERT INTO votes (week_id, user_name, votes_json) VALUES (?, ?, ?)",
-          [week.id, userName, JSON.stringify(votes)],
-          function(err) {
+    getMember(userName, (err, member) => {
+      if (err || !member) {
+        return res.json({ success: false, error: 'User not found' });
+      }
+      
+      // Check if user already voted
+      req.db.get(
+        "SELECT id FROM votes WHERE week_id = ? AND member_id = ?",
+        [week.id, member.id],
+        (err, existing) => {
+          if (err) {
+            console.error(err);
+            return res.json({ success: false, error: 'Database error' });
+          }
+          
+          if (existing) {
+            return res.json({ success: false, error: 'You have already voted for this week' });
+          }
+          
+          // Convert votes object to ranked nominations array for submitVotes helper
+          const rankedNominations = Object.entries(votes).map(([nominationId, points]) => {
+            const totalNominations = Object.keys(votes).length;
+            const rank = totalNominations - points + 1;
+            return { nominationId: parseInt(nominationId), rank };
+          });
+          
+          // Sort by rank to ensure proper order
+          rankedNominations.sort((a, b) => a.rank - b.rank);
+          
+          // Use the helper function to submit votes
+          submitVotes(week.id, member.id, rankedNominations, (err) => {
             if (err) {
               console.error(err);
               return res.json({ success: false, error: 'Failed to save vote' });
             }
             
             res.json({ success: true });
-          }
-        );
-      }
-    );
+          });
+        }
+      );
+    });
   });
 });
 

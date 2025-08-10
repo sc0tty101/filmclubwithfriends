@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { getOrCreateFilm, addNomination, getMember } = require('../database/setup');
 
 // ENHANCED NOMINATION PAGE
 router.get('/nominate/:date', (req, res) => {
@@ -17,9 +18,14 @@ router.get('/nominate/:date', (req, res) => {
       return res.status(404).send('Week not found');
     }
     
-    // Get existing nominations for this week
+    // Get existing nominations for this week with film and member info
     req.db.all(
-      "SELECT * FROM nominations WHERE week_id = ? ORDER BY nominated_at",
+      `SELECT n.id, f.title as film_title, f.year as film_year, f.poster_url, 
+              m.name as user_name, n.nominated_at
+       FROM nominations n
+       JOIN films f ON n.film_id = f.id  
+       JOIN members m ON n.member_id = m.id
+       WHERE n.week_id = ? ORDER BY n.nominated_at`,
       [week.id],
       (err, nominations) => {
         if (err) {
@@ -392,48 +398,66 @@ router.post('/nominate/:date', (req, res) => {
     return res.json({ success: false, error: 'Film information and user name are required' });
   }
   
-  // Get week ID
+  // Get week ID and member ID
   req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
     if (err || !week) {
       console.error(err);
       return res.json({ success: false, error: 'Week not found' });
     }
     
-    // Check if user already nominated for this week
-    req.db.get(
-      "SELECT id FROM nominations WHERE week_id = ? AND user_name = ?",
-      [week.id, userName],
-      (err, existing) => {
-        if (err) {
-          console.error(err);
-          return res.json({ success: false, error: 'Database error' });
-        }
-        
-        if (existing) {
-          return res.json({ success: false, error: 'You have already nominated a film for this week' });
-        }
-        
-        // Insert nomination with all enhanced data
-        req.db.run(
-          `INSERT INTO nominations (
-            week_id, user_name, film_title, film_year, poster_url, backdrop_url,
-            tmdb_id, vote_average, release_date, runtime, overview, director, tmdb_genres
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            week.id, userName, filmTitle, filmYear, posterUrl, backdropUrl,
-            tmdbId, voteAverage, releaseDate, runtime, overview, director, tmdbGenres
-          ],
-          function(err) {
+    // Get member ID
+    getMember(userName, (err, member) => {
+      if (err || !member) {
+        return res.json({ success: false, error: 'User not found' });
+      }
+      
+      // Check if user already nominated for this week
+      req.db.get(
+        "SELECT id FROM nominations WHERE week_id = ? AND member_id = ?",
+        [week.id, member.id],
+        (err, existing) => {
+          if (err) {
+            console.error(err);
+            return res.json({ success: false, error: 'Database error' });
+          }
+          
+          if (existing) {
+            return res.json({ success: false, error: 'You have already nominated a film for this week' });
+          }
+          
+          // Create or get film record
+          const filmData = {
+            tmdb_id: tmdbId,
+            title: filmTitle,
+            year: parseInt(filmYear) || null,
+            director: director || null,
+            runtime: parseInt(runtime) || null,
+            poster_url: posterUrl || null,
+            backdrop_url: backdropUrl || null,
+            tmdb_rating: parseFloat(voteAverage) || null,
+            overview: overview || null,
+            genres: tmdbGenres || null
+          };
+          
+          getOrCreateFilm(filmData, (err, filmId) => {
             if (err) {
               console.error(err);
-              return res.json({ success: false, error: 'Failed to save nomination' });
+              return res.json({ success: false, error: 'Failed to save film data' });
             }
             
-            res.json({ success: true });
-          }
-        );
-      }
-    );
+            // Add nomination with film_id and member_id
+            addNomination(week.id, filmId, member.id, (err) => {
+              if (err) {
+                console.error(err);
+                return res.json({ success: false, error: 'Failed to save nomination' });
+              }
+              
+              res.json({ success: true });
+            });
+          });
+        }
+      );
+    });
   });
 });
 
