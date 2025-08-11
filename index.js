@@ -1,12 +1,8 @@
-// Simplified index.js
+// index.js - Simplified version
 const express = require('express');
 const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
-
-// Set up EJS as view engine
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
 
 // Import database
 const dbModule = require('./database/setup');
@@ -18,12 +14,12 @@ app.use(express.static('public'));
 
 // Make database available to all routes
 app.use((req, res, next) => {
-  req.db = dbModule.db; // Use only the db instance for req.db
+  req.db = dbModule.db;
   next();
 });
 
 // Import routes
-const calendarRoutes = require('./routes/calendar'); // NEW
+const calendarRoutes = require('./routes/calendar');
 const membersRoutes = require('./routes/members');
 const genresRoutes = require('./routes/genres');
 const weeksRoutes = require('./routes/weeks');
@@ -31,12 +27,9 @@ const adminRoutes = require('./routes/admin');
 const filmsRoutes = require('./routes/films');
 const votesRoutes = require('./routes/votes');
 const resultsRoutes = require('./routes/results');
-const statisticsRoutes = require('./routes/statistics');
-const importRoutes = require('./routes/import');
-const tableViewRoutes = require('./routes/table-view');
 
 // Use routes
-app.use('/', calendarRoutes); // NEW - handles the main calendar view
+app.use('/', calendarRoutes);
 app.use('/', membersRoutes);
 app.use('/', genresRoutes);
 app.use('/', weeksRoutes);
@@ -44,9 +37,6 @@ app.use('/', adminRoutes);
 app.use('/', filmsRoutes);
 app.use('/', votesRoutes);
 app.use('/', resultsRoutes);
-app.use('/', statisticsRoutes);
-app.use('/', importRoutes);
-app.use('/', tableViewRoutes);
 
 // Start server
 app.listen(port, () => {
