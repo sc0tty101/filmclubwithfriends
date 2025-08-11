@@ -130,10 +130,6 @@ router.get('/nominate/:date', (req, res) => {
               <a href="/" class="btn btn-secondary">Back to Calendar</a>
             </div>
           </div>
-
-         // UPDATE for routes/films.js
-// Replace the existing <script> section (around lines 140-200) with this:
-
 <script>
   const API_KEY = 'cde76a7a245e3ba8dbaaeb37ac96e6f6';
   
