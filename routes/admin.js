@@ -1,449 +1,96 @@
-// routes/admin.js
+// routes/admin.js - Simplified to just database management
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const { createAllTables, dbPath } = require('../database/setup');
 
-// Main admin page with all admin functions
-router.get('/admin/import-genres', (req, res) => {
-  // Get current members for display
-  req.db.all("SELECT name, is_admin FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
-    if (err) {
-      console.error(err);
-      members = [];
-    }
+// Simple admin page with just database functions
+router.get('/admin', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Admin - Film Club</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="stylesheet" href="/styles/main.css">
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>🔧 Admin Panel</h1>
+          <p>Database management tools</p>
+        </div>
 
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Admin Panel - Film Club</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="/styles/main.css">
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>🔧 Film Club Admin Panel</h1>
-            <p>Manage all administrative functions for your film club</p>
-          </div>
+        <div class="card">
+          <h2>Database Management</h2>
+          <p><strong>⚠️ Use with caution!</strong></p>
 
-          <!-- Member Management Section -->
-          <div class="card">
-            <h2>👥 Member Management</h2>
+          <div style="margin-bottom: 30px;">
+            <h3>Clear All Data</h3>
+            <p>Remove all data from the database while keeping the table structure intact.</p>
+            <p><small>This will delete all weeks, nominations, votes, members, and genres.</small></p>
             
-            <div class="member-list" style="margin-bottom: 30px;">
-              <h3>Current Members (${members.length})</h3>
-              ${members.length === 0 ? 
-                '<p style="text-align: center; color: #666;">No members yet. Add some below!</p>' :
-                members.map(member => `
-                  <div class="member-item">
-                    <div class="member-info">
-                      <span class="member-name">${member.name}</span>
-                      ${member.is_admin ? '<span class="admin-badge">Admin</span>' : ''}
-                    </div>
-                    <div class="member-controls">
-                      <form action="/admin/toggle-admin" method="POST" style="display: inline;">
-                        <input type="hidden" name="memberName" value="${member.name}">
-                        <input type="hidden" name="currentAdmin" value="${member.is_admin}">
-                        <button type="submit" class="btn btn-secondary">
-                          ${member.is_admin ? 'Remove Admin' : 'Make Admin'}
-                        </button>
-                      </form>
-                      <form action="/admin/remove-member" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to remove ${member.name}?')">
-                        <input type="hidden" name="memberName" value="${member.name}">
-                        <button type="submit" class="btn btn-danger">Remove</button>
-                      </form>
-                    </div>
-                  </div>
-                `).join('')
-              }
-            </div>
-
-            <h3>Add New Member</h3>
-            <form action="/admin/add-member" method="POST">
-              <div class="form-group">
-                <label>Member Name:</label>
-                <input type="text" name="memberName" placeholder="Enter member name" required maxlength="50">
-              </div>
-              <div class="form-group">
-                <label>
-                  <input type="checkbox" name="isAdmin" value="1"> Make this member an admin
-                </label>
-              </div>
-              <div class="actions">
-                <button type="submit" class="btn btn-primary">Add Member</button>
-              </div>
+            <form action="/admin/clear-data" method="POST" onsubmit="return confirm('Are you sure? This will delete all data.')">
+              <button type="submit" class="btn btn-warning">Clear All Data</button>
             </form>
           </div>
-
-          <!-- Genre Import Section -->
-          <div class="card">
-            <h2>🎭 Bulk Import Genres</h2>
-            <p>Import all your genres at once. Use this page only once during initial setup!</p>
+          
+          <div>
+            <h3>Reset Database</h3>
+            <p>Completely wipe and recreate the database with fresh tables.</p>
+            <p><small>Database location: ${dbPath}</small></p>
             
-            <form action="/admin/import-genres" method="POST">
-              <div class="form-group">
-                <label>Paste your genre list (one per line):</label>
-                <textarea name="genreList" rows="15" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;" placeholder="Action Sci-Fi & Fantasy
-Action Thrillers
-Adventures
-..."></textarea>
-              </div>
-              
-              <div class="actions">
-                <button type="submit" class="btn btn-primary">Import All Genres</button>
-              </div>
+            <form action="/admin/reset-database" method="POST" onsubmit="return confirm('Are you absolutely sure? This will delete everything!')">
+              <button type="submit" class="btn btn-danger">Reset Database</button>
             </form>
-          </div>
-
-          <!-- Historical Data Import Section -->
-          <div class="card">
-            <h2>📊 Import Historical Data</h2>
-            <p>Import your film club history from spreadsheet data (weeks, nominations, winners)</p>
-            
-            <div style="margin: 20px 0;">
-              <p><strong>This tool will:</strong></p>
-              <ul style="margin: 10px 0; padding-left: 25px;">
-                <li>Parse your spreadsheet data automatically</li>
-                <li>Create weeks and nominations</li>
-                <li>Mark winners based on vote scores</li>
-                <li>Create any missing members</li>
-                <li>Skip problematic weeks (5a/5b, etc.)</li>
-              </ul>
-            </div>
-            
-            <div class="actions">
-              <a href="/admin/import-historical" class="btn btn-primary btn-large">
-                📥 Import Historical Data
-              </a>
-            </div>
-          </div>
-
-          <!-- Database Management Section -->
-          <div class="card">
-            <h2>🗃️ Database Management</h2>
-            <p><strong>⚠️ Development Tools - Use with caution!</strong></p>
-
-            <div style="margin-bottom: 30px;">
-              <h3>Clear All Data</h3>
-              <p>Remove all data from the database while keeping the table structure intact. 
-                 Perfect for testing and development - no restart required!</p>
-              <p><strong>⚠️ This will delete:</strong> All weeks, nominations, votes, members, and genres!</p>
-              <p><strong>✅ Keeps:</strong> Database connection and table structure</p>
-              
-              <form action="/admin/clear-data" method="POST" onsubmit="return confirm('Are you sure? This will delete all data but keep the database structure.')">
-                <button type="submit" class="btn btn-warning">🧹 Clear All Data</button>
-              </form>
-            </div>
-            
-            <div style="margin-bottom: 20px;">
-              <h3>Reset Database</h3>
-              <p>Completely wipe the database file and recreate with the latest schema. 
-                 Useful for applying schema changes during development.</p>
-              <p><strong>⚠️ This will delete:</strong> All data AND recreate the database file!</p>
-              <p><strong>🔄 Requires:</strong> Application restart after use</p>
-              <p><small><strong>Database location:</strong> ${dbPath}</small></p>
-              
-              <form action="/admin/reset-database" method="POST" onsubmit="return confirm('Are you absolutely sure? This will delete ALL data and requires an app restart!')">
-                <button type="submit" class="btn btn-danger">🗑️ Reset Database</button>
-              </form>
-            </div>
-          </div>
-
-          <!-- Table View Section -->
-          <div class="card">
-            <h2>📊 Data Views</h2>
-            <p>Alternative views for your film club data</p>
-            
-            <div style="margin: 20px 0;">
-              <p><strong>Table View Features:</strong></p>
-              <ul style="margin: 10px 0; padding-left: 25px;">
-                <li>See all weeks in a condensed table</li>
-                <li>Filter by phase, genre, winner, or year</li>
-                <li>Sort by any column</li>
-                <li>Export to CSV for spreadsheets</li>
-                <li>Color-coded week status</li>
-                <li>Quick access to actions for each week</li>
-              </ul>
-            </div>
-            
-            <div class="actions">
-              <a href="/admin/table-view" class="btn btn-primary">
-                📊 Open Table View
-              </a>
-              <a href="/" class="btn btn-secondary">
-                📅 Calendar View
-              </a>
-            </div>
-          </div>
-
-          <div class="actions">
-            <a href="/manage-genres" class="btn btn-secondary">Manage Genres</a>
-            <a href="/" class="btn btn-success">Back to Calendar</a>
           </div>
         </div>
 
-        <script>
-          // Show success/error messages if they exist
-          const urlParams = new URLSearchParams(window.location.search);
-          const message = urlParams.get('message');
-          const type = urlParams.get('type');
-          
-          if (message) {
-            const alertDiv = document.createElement('div');
-            alertDiv.className = \`alert alert-\${type || 'success'}\`;
-            alertDiv.textContent = decodeURIComponent(message);
-            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.header').nextSibling);
-          }
-        </script>
-      </body>
-      </html>
-    `);
-  });
+        <div class="actions center">
+          <a href="/" class="btn btn-secondary">Back to Calendar</a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
 });
 
-// Handle bulk genre import
-router.post('/admin/import-genres', (req, res) => {
-  const genreList = req.body.genreList;
-  
-  if (!genreList) {
-    return res.status(400).send('Genre list is required');
-  }
-  
-  // Split by lines and clean up
-  const genres = genreList
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => line.length > 0)
-    .filter(line => line.length <= 100); // Safety limit
-  
-  let imported = 0;
-  let skipped = 0;
-  let completed = 0;
-  
-  if (genres.length === 0) {
-    return res.send('No valid genres found');
-  }
-  
-  // Insert each genre
-  genres.forEach((genre, index) => {
-    req.db.run(
-      "INSERT OR IGNORE INTO genres (name) VALUES (?)",
-      [genre],
-      function(err) {
-        completed++;
-        
-        if (err) {
-          console.error(`Error importing ${genre}:`, err);
-          skipped++;
-        } else if (this.changes > 0) {
-          imported++;
-        } else {
-          skipped++; // Already exists
-        }
-        
-        // When all are done, show results
-        if (completed === genres.length) {
-          res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Import Complete - Film Club</title>
-              <link rel="stylesheet" href="/styles/main.css">
-            </head>
-            <body>
-              <div class="container">
-                <div class="card">
-                  <h1>✅ Import Complete!</h1>
-                  <p><strong>Total processed:</strong> ${genres.length}</p>
-                  <p><strong>Successfully imported:</strong> ${imported}</p>
-                  <p><strong>Skipped (duplicates/errors):</strong> ${skipped}</p>
-                  
-                  <div class="actions">
-                    <a href="/manage-genres" class="btn btn-primary">View All Genres</a>
-                    <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
-                    <a href="/" class="btn btn-success">Back to Calendar</a>
-                  </div>
-                </div>
-              </div>
-            </body>
-            </html>
-          `);
-        }
-      }
-    );
-  });
-});
-
-// Handle member management
-router.post('/admin/add-member', (req, res) => {
-  const memberName = req.body.memberName?.trim();
-  const isAdmin = req.body.isAdmin ? 1 : 0;
-  
-  if (!memberName) {
-    return res.redirect('/admin/import-genres?message=Member name is required&type=error');
-  }
-
-  if (memberName.length > 50) {
-    return res.redirect('/admin/import-genres?message=Member name too long (max 50 characters)&type=error');
-  }
-
-  // First, try to reactivate existing member
-  req.db.run(
-    "UPDATE members SET is_active = 1, is_admin = ? WHERE name = ?",
-    [isAdmin, memberName],
-    function(err) {
-      if (err) {
-        console.error(err);
-        return res.redirect('/admin/import-genres?message=Failed to add member&type=error');
-      }
-      
-      // If no rows were updated (member doesn't exist), insert new member
-      if (this.changes === 0) {
-        req.db.run(
-          "INSERT INTO members (name, is_admin, is_active) VALUES (?, ?, 1)",
-          [memberName, isAdmin],
-          function(err) {
-            if (err) {
-              console.error(err);
-              return res.redirect('/admin/import-genres?message=Failed to add member&type=error');
-            }
-            res.redirect('/admin/import-genres?message=Member added successfully');
-          }
-        );
-      } else {
-        res.redirect('/admin/import-genres?message=Member reactivated successfully');
-      }
-    }
-  );
-});
-
-router.post('/admin/remove-member', (req, res) => {
-  const memberName = req.body.memberName;
-  
-  if (!memberName) {
-    return res.redirect('/admin/import-genres?message=Member name is required&type=error');
-  }
-
-  req.db.run(
-    "UPDATE members SET is_active = 0 WHERE name = ?",
-    [memberName],
-    function(err) {
-      if (err) {
-        console.error(err);
-        return res.redirect('/admin/import-genres?message=Failed to remove member&type=error');
-      }
-      
-      if (this.changes === 0) {
-        return res.redirect('/admin/import-genres?message=Member not found&type=error');
-      }
-      
-      res.redirect('/admin/import-genres?message=Member removed successfully');
-    }
-  );
-});
-
-router.post('/admin/toggle-admin', (req, res) => {
-  const memberName = req.body.memberName;
-  const currentAdmin = parseInt(req.body.currentAdmin);
-  const newAdminStatus = currentAdmin ? 0 : 1;
-  
-  if (!memberName) {
-    return res.redirect('/admin/import-genres?message=Member name is required&type=error');
-  }
-
-  req.db.run(
-    "UPDATE members SET is_admin = ? WHERE name = ?",
-    [newAdminStatus, memberName],
-    function(err) {
-      if (err) {
-        console.error(err);
-        return res.redirect('/admin/import-genres?message=Failed to update admin status&type=error');
-      }
-      
-      const action = newAdminStatus ? 'granted' : 'removed';
-      res.redirect(`/admin/import-genres?message=Admin privileges ${action} for ${memberName}`);
-    }
-  );
-});
-
-// Handle clearing all data (keeps schema intact)
+// Clear all data (keeps schema)
 router.post('/admin/clear-data', (req, res) => {
-  console.log('Starting data clear...');
-  
-  // Clear all data in correct order (respecting foreign keys)
   const clearQueries = [
     "DELETE FROM votes",
+    "DELETE FROM results",
     "DELETE FROM nominations", 
     "DELETE FROM weeks",
+    "DELETE FROM films",
     "DELETE FROM members",
     "DELETE FROM genres"
   ];
   
-  let completedQueries = 0;
-  let hasError = false;
+  let completed = 0;
   
-  clearQueries.forEach((query, index) => {
+  clearQueries.forEach(query => {
     req.db.run(query, function(err) {
-      if (err && !hasError) {
-        hasError = true;
-        console.error(`Error executing ${query}:`, err);
-        return res.status(500).send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Clear Data Error - Film Club</title>
-            <link rel="stylesheet" href="/styles/main.css">
-          </head>
-          <body>
-            <div class="container">
-              <div class="card">
-                <h1>❌ Clear Data Failed</h1>
-                <p>Error clearing data: ${err.message}</p>
-                <div class="actions">
-                  <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
-                </div>
-              </div>
-            </div>
-          </body>
-          </html>
-        `);
-      }
+      completed++;
       
-      if (!hasError) {
-        console.log(`Cleared: ${query} (${this.changes} rows deleted)`);
-        completedQueries++;
-        
-        // When all queries are done, show success
-        if (completedQueries === clearQueries.length) {
-          console.log('Data clear complete - all tables emptied');
-          
+      if (completed === clearQueries.length) {
+        if (err) {
           res.send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Data Cleared - Film Club</title>
-              <link rel="stylesheet" href="/styles/main.css">
-            </head>
-            <body>
-              <div class="container">
-                <div class="card">
-                  <h1>✅ All Data Cleared!</h1>
-                  <p>All data has been successfully removed from the database.</p>
-                  <p><strong>Tables are empty but structure remains intact.</strong></p>
-                  <p>You can now add fresh data without restarting the application.</p>
-                  
-                  <div class="actions">
-                    <a href="/admin/import-genres" class="btn btn-primary">Back to Admin</a>
-                    <a href="/manage-genres" class="btn btn-secondary">Add Genres</a>
-                    <a href="/" class="btn btn-success">Back to Calendar</a>
-                  </div>
-                </div>
-              </div>
-            </body>
-            </html>
+            <html><body>
+            <h1>Error clearing data</h1>
+            <p>${err.message}</p>
+            <a href="/admin">Back</a>
+            </body></html>
+          `);
+        } else {
+          res.send(`
+            <html><body>
+            <h1>✅ All data cleared!</h1>
+            <p>Database is empty but structure remains.</p>
+            <a href="/admin">Back to Admin</a> | 
+            <a href="/">Back to Calendar</a>
+            </body></html>
           `);
         }
       }
@@ -451,108 +98,52 @@ router.post('/admin/clear-data', (req, res) => {
   });
 });
 
-// Handle database reset - NOW USES CENTRALIZED SCHEMA
+// Reset database completely
 router.post('/admin/reset-database', (req, res) => {
-  console.log('Starting database reset...');
-  console.log('Database path:', dbPath);
-  
-  // Close current database connection
+  // Close current connection
   req.db.close((closeErr) => {
     if (closeErr) {
       console.error('Error closing database:', closeErr);
     }
     
-    // Delete the database file
+    // Delete database file
     try {
       if (fs.existsSync(dbPath)) {
         fs.unlinkSync(dbPath);
-        console.log('Old database deleted');
       }
       
-      // Create new database with fresh schema
+      // Create new database
       const newDb = new sqlite3.Database(dbPath);
       
-      // Use the centralized createAllTables function
       createAllTables(newDb, (err) => {
-        if (err) {
-          console.error('Error creating tables:', err);
-          newDb.close();
-          return res.status(500).send(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Reset Error - Film Club</title>
-              <link rel="stylesheet" href="/styles/main.css">
-            </head>
-            <body>
-              <div class="container">
-                <div class="card">
-                  <h1>❌ Reset Failed</h1>
-                  <p>Error creating tables: ${err.message}</p>
-                  <div class="actions">
-                    <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
-                  </div>
-                </div>
-              </div>
-            </body>
-            </html>
-          `);
-        }
-        
-        console.log('Database reset complete - new schema created');
-        
-        // Close the new database connection
         newDb.close();
         
-        // Send success response
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Database Reset Complete - Film Club</title>
-            <link rel="stylesheet" href="/styles/main.css">
-          </head>
-          <body>
-            <div class="container">
-              <div class="card">
-                <h1>✅ Database Reset Complete!</h1>
-                <p>The database has been successfully reset with the latest schema.</p>
-                <p><strong>Fresh start:</strong> All tables have been recreated and are ready to use.</p>
-                <p><small><strong>Database location:</strong> ${dbPath}</small></p>
-                
-                <div class="actions">
-                  <a href="/admin/import-genres" class="btn btn-primary">Back to Admin</a>
-                  <a href="/manage-genres" class="btn btn-secondary">Add Genres</a>
-                  <a href="/" class="btn btn-success">Back to Calendar</a>
-                </div>
-              </div>
-            </div>
-          </body>
-          </html>
-        `);
+        if (err) {
+          res.send(`
+            <html><body>
+            <h1>Error resetting database</h1>
+            <p>${err.message}</p>
+            <a href="/admin">Back</a>
+            </body></html>
+          `);
+        } else {
+          res.send(`
+            <html><body>
+            <h1>✅ Database reset complete!</h1>
+            <p>Fresh database created. Application restart may be required.</p>
+            <a href="/admin">Back to Admin</a> | 
+            <a href="/">Back to Calendar</a>
+            </body></html>
+          `);
+        }
       });
-      
     } catch (err) {
-      console.error('Error during database reset:', err);
-      res.status(500).send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Reset Error - Film Club</title>
-          <link rel="stylesheet" href="/styles/main.css">
-        </head>
-        <body>
-          <div class="container">
-            <div class="card">
-              <h1>❌ Reset Failed</h1>
-              <p>Error resetting database: ${err.message}</p>
-              <div class="actions">
-                <a href="/admin/import-genres" class="btn btn-secondary">Back to Admin</a>
-              </div>
-            </div>
-          </div>
-        </body>
-        </html>
+      res.send(`
+        <html><body>
+        <h1>Error resetting database</h1>
+        <p>${err.message}</p>
+        <a href="/admin">Back</a>
+        </body></html>
       `);
     }
   });
