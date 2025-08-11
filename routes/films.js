@@ -131,70 +131,116 @@ router.get('/nominate/:date', (req, res) => {
             </div>
           </div>
 
-          <script>
-            const API_KEY = 'cde76a7a245e3ba8dbaaeb37ac96e6f6';
-            
-            function searchFilms() {
-              const query = document.getElementById('filmSearch').value;
-              if (!query) return;
-              
-              fetch(\`https://api.themoviedb.org/3/search/movie?api_key=\${API_KEY}&query=\${encodeURIComponent(query)}\`)
-                .then(r => r.json())
-                .then(data => {
-                  const results = document.getElementById('searchResults');
-                  if (data.results && data.results.length > 0) {
-                    results.innerHTML = '<div class="search-results">' +
-                      data.results.slice(0, 5).map(film => \`
-                        <div class="search-result-item" onclick="selectFilm(\${film.id})">
-                          <strong>\${film.title}</strong> 
-                          \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}
-                          <br>
-                          <small>\${film.overview ? film.overview.substring(0, 100) + '...' : ''}</small>
-                        </div>
-                      \`).join('') + '</div>';
-                  } else {
-                    results.innerHTML = '<p>No results found</p>';
-                  }
-                });
-            }
-            
-            function selectFilm(tmdbId) {
-              fetch(\`https://api.themoviedb.org/3/movie/\${tmdbId}?api_key=\${API_KEY}&append_to_response=credits\`)
-                .then(r => r.json())
-                .then(film => {
-                  document.getElementById('selectedFilm').style.display = 'block';
-                  document.getElementById('searchResults').innerHTML = '';
-                  
-                  const director = film.credits?.crew?.find(c => c.job === 'Director');
-                  
-                  document.getElementById('selectedDetails').innerHTML = \`
-                    <div class="film-card">
-                      \${film.poster_path ? 
-                        '<img src="https://image.tmdb.org/t/p/w92' + film.poster_path + '" class="film-poster">' :
-                        '<div class="poster-placeholder">No poster</div>'
-                      }
-                      <div>
-                        <strong>\${film.title}</strong> 
-                        \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}<br>
-                        \${director ? 'Director: ' + director.name + '<br>' : ''}
-                        \${film.runtime ? 'Runtime: ' + film.runtime + ' mins<br>' : ''}
-                        \${film.vote_average ? 'Rating: ' + film.vote_average + '/10' : ''}
-                      </div>
-                      <div style="clear: both;"></div>
-                    </div>
-                  \`;
-                  
-                  document.getElementById('tmdbId').value = film.id;
-                  document.getElementById('title').value = film.title;
-                  document.getElementById('year').value = film.release_date ? film.release_date.substring(0, 4) : '';
-                  document.getElementById('posterUrl').value = film.poster_path || '';
-                  document.getElementById('director').value = director ? director.name : '';
-                  document.getElementById('runtime').value = film.runtime || '';
-                  document.getElementById('rating').value = film.vote_average || '';
-                  document.getElementById('overview').value = film.overview || '';
-                });
-            }
-          </script>
+         // UPDATE for routes/films.js
+// Replace the existing <script> section (around lines 140-200) with this:
+
+<script>
+  const API_KEY = 'cde76a7a245e3ba8dbaaeb37ac96e6f6';
+  
+  // JSONP helper function
+  function makeJSONPRequest(url, callback) {
+    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+    
+    // Create script element
+    const script = document.createElement('script');
+    
+    // Define callback function
+    window[callbackName] = function(data) {
+      callback(null, data);
+      // Cleanup
+      document.head.removeChild(script);
+      delete window[callbackName];
+    };
+    
+    // Handle errors
+    script.onerror = function() {
+      callback(new Error('JSONP request failed'));
+      document.head.removeChild(script);
+      delete window[callbackName];
+    };
+    
+    // Set script source with callback parameter
+    script.src = url + '&callback=' + callbackName;
+    
+    // Add script to document
+    document.head.appendChild(script);
+  }
+  
+  function searchFilms() {
+    const query = document.getElementById('filmSearch').value;
+    if (!query) return;
+    
+    const url = \`https://api.themoviedb.org/3/search/movie?api_key=\${API_KEY}&query=\${encodeURIComponent(query)}\`;
+    
+    // Show loading state
+    document.getElementById('searchResults').innerHTML = '<p>Searching...</p>';
+    
+    makeJSONPRequest(url, function(error, data) {
+      const results = document.getElementById('searchResults');
+      
+      if (error) {
+        results.innerHTML = '<p style="color: red;">Search failed: ' + error.message + '</p>';
+        return;
+      }
+      
+      if (data.results && data.results.length > 0) {
+        results.innerHTML = '<div class="search-results">' +
+          data.results.slice(0, 5).map(film => \`
+            <div class="search-result-item" onclick="selectFilm(\${film.id})">
+              <strong>\${film.title}</strong> 
+              \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}
+              <br>
+              <small>\${film.overview ? film.overview.substring(0, 100) + '...' : ''}</small>
+            </div>
+          \`).join('') + '</div>';
+      } else {
+        results.innerHTML = '<p>No results found</p>';
+      }
+    });
+  }
+  
+  function selectFilm(tmdbId) {
+    const url = \`https://api.themoviedb.org/3/movie/\${tmdbId}?api_key=\${API_KEY}&append_to_response=credits\`;
+    
+    makeJSONPRequest(url, function(error, film) {
+      if (error) {
+        alert('Failed to load film details: ' + error.message);
+        return;
+      }
+      
+      document.getElementById('selectedFilm').style.display = 'block';
+      document.getElementById('searchResults').innerHTML = '';
+      
+      const director = film.credits?.crew?.find(c => c.job === 'Director');
+      
+      document.getElementById('selectedDetails').innerHTML = \`
+        <div class="film-card">
+          \${film.poster_path ? 
+            '<img src="https://image.tmdb.org/t/p/w92' + film.poster_path + '" class="film-poster">' :
+            '<div class="poster-placeholder">No poster</div>'
+          }
+          <div>
+            <strong>\${film.title}</strong> 
+            \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}<br>
+            \${director ? 'Director: ' + director.name + '<br>' : ''}
+            \${film.runtime ? 'Runtime: ' + film.runtime + ' mins<br>' : ''}
+            \${film.vote_average ? 'Rating: ' + film.vote_average + '/10' : ''}
+          </div>
+          <div style="clear: both;"></div>
+        </div>
+      \`;
+      
+      document.getElementById('tmdbId').value = film.id;
+      document.getElementById('title').value = film.title;
+      document.getElementById('year').value = film.release_date ? film.release_date.substring(0, 4) : '';
+      document.getElementById('posterUrl').value = film.poster_path || '';
+      document.getElementById('director').value = director ? director.name : '';
+      document.getElementById('runtime').value = film.runtime || '';
+      document.getElementById('rating').value = film.vote_average || '';
+      document.getElementById('overview').value = film.overview || '';
+    });
+  }
+</script>
         </body>
         </html>
       `);
