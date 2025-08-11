@@ -1,16 +1,17 @@
+// routes/weeks.js - Simplified week genre setting
 const express = require('express');
 const router = express.Router();
 const { getGenres } = require('../database/setup');
 
-// SET GENRE PAGE
+// Set genre page
 router.get('/set-genre/:date', (req, res) => {
   const weekDate = req.params.date;
+  const currentUser = req.query.user || '';
   
-  // Get genres from database
   getGenres((err, genres) => {
     if (err) {
       console.error(err);
-      return res.status(500).send('Database error');
+      genres = [];
     }
 
     res.send(`
@@ -23,27 +24,36 @@ router.get('/set-genre/:date', (req, res) => {
       </head>
       <body>
         <div class="container">
-          <div class="card">
+          <div class="header">
             <h1>Set Genre for Week</h1>
-            <p><strong>Week starting:</strong> ${new Date(weekDate).toLocaleDateString()}</p>
-            
-            <form action="/set-genre/${weekDate}" method="POST" onsubmit="return validateGenreForm()">
+            <p>Week starting: ${new Date(weekDate).toLocaleDateString()}</p>
+          </div>
+          
+          <div class="card">
+            <form action="/set-genre/${weekDate}" method="POST">
+              <input type="hidden" name="user" value="${currentUser}">
+              
               <div class="form-group">
                 <label>Choose Genre:</label>
-                <select name="genre" id="genreSelect" onchange="clearCustomWhenDropdownSelected()">
+                <select name="genre" id="genreSelect">
                   <option value="">Select a genre...</option>
-                  ${genres.map(genre => `<option value="${genre.name}">${genre.name}</option>`).join('')}
+                  ${genres.map(genre => 
+                    `<option value="${genre.id}">${genre.name}</option>`
+                  ).join('')}
                 </select>
               </div>
               
               <div class="form-group">
                 <label>Or enter custom genre:</label>
-                <input type="text" name="customGenre" id="customGenre" placeholder="e.g., XMAS FILMS, 80s Movies" oninput="clearDropdownWhenCustomTyped()">
+                <input type="text" name="customGenre" id="customGenre" 
+                       placeholder="e.g., XMAS FILMS, 80s Movies">
               </div>
               
               <div class="actions">
                 <button type="submit" class="btn btn-primary">Set Genre</button>
-                <button type="button" class="btn btn-warning" onclick="setRandomGenre()">🎲 Pick Random & Set</button>
+                <button type="button" class="btn btn-warning" onclick="setRandomGenre()">
+                  🎲 Random Genre
+                </button>
                 <a href="/" class="btn btn-secondary">Cancel</a>
               </div>
             </form>
@@ -51,54 +61,27 @@ router.get('/set-genre/:date', (req, res) => {
         </div>
 
         <script>
-        function validateGenreForm() {
-          const dropdown = document.getElementById('genreSelect').value;
-          const custom = document.getElementById('customGenre').value.trim();
+          // Clear the other field when one is used
+          document.getElementById('genreSelect').addEventListener('change', function() {
+            if (this.value) document.getElementById('customGenre').value = '';
+          });
           
-          if (!dropdown && !custom) {
-            alert('Please either select a genre from the dropdown OR enter a custom genre.');
-            return false;
+          document.getElementById('customGenre').addEventListener('input', function() {
+            if (this.value) document.getElementById('genreSelect').value = '';
+          });
+          
+          function setRandomGenre() {
+            const select = document.getElementById('genreSelect');
+            const options = Array.from(select.options).filter(o => o.value);
+            if (options.length > 0) {
+              const random = options[Math.floor(Math.random() * options.length)];
+              select.value = random.value;
+              document.getElementById('customGenre').value = '';
+              document.querySelector('form').submit();
+            } else {
+              alert('No genres available!');
+            }
           }
-          
-          return true;
-        }
-        
-        function clearCustomWhenDropdownSelected() {
-          const dropdown = document.getElementById('genreSelect');
-          const custom = document.getElementById('customGenre');
-          
-          if (dropdown.value) {
-            custom.value = '';
-          }
-        }
-        
-        function clearDropdownWhenCustomTyped() {
-          const dropdown = document.getElementById('genreSelect');
-          const custom = document.getElementById('customGenre');
-          
-          if (custom.value.trim()) {
-            dropdown.value = '';
-          }
-        }
-        
-        function setRandomGenre() {
-          const genreSelect = document.querySelector('select[name="genre"]');
-          const options = Array.from(genreSelect.options).filter(option => option.value !== "");
-          
-          if (options.length > 0) {
-            const randomIndex = Math.floor(Math.random() * options.length);
-            const randomOption = options[randomIndex];
-            genreSelect.value = randomOption.value;
-            
-            // Clear custom field since we're using dropdown
-            document.getElementById('customGenre').value = '';
-            
-            // Submit the form
-            document.querySelector('form').submit();
-          } else {
-            alert('No genres available to choose from!');
-          }
-        }
         </script>
       </body>
       </html>
@@ -106,170 +89,73 @@ router.get('/set-genre/:date', (req, res) => {
   });
 });
 
-// HANDLE GENRE SETTING
+// Handle genre setting
 router.post('/set-genre/:date', (req, res) => {
   const weekDate = req.params.date;
-  const genreName = (req.body.customGenre && req.body.customGenre.trim()) || req.body.genre;
-  const currentUser = req.query.user || 'Unknown'; // Get user from query params
+  const genreId = req.body.genre;
+  const customGenre = req.body.customGenre?.trim();
   
-  console.log('Genre setting request:', { customGenre: req.body.customGenre, dropdownGenre: req.body.genre, finalGenre: genreName });
-  
-  if (!genreName) {
-    return res.status(400).send('Genre is required - please select from dropdown or enter custom genre');
+  if (!genreId && !customGenre) {
+    return res.status(400).send('Please select or enter a genre');
   }
 
-  // First, get the member ID for the setter
-  req.db.get("SELECT id FROM members WHERE name = ?", [currentUser], (err, member) => {
-    if (err) {
-      console.error('Error finding member:', err);
-    }
-    
-    const setterId = member ? member.id : null;
-
-    // Get or create the genre
-    req.db.get("SELECT id FROM genres WHERE name = ?", [genreName], (err, genre) => {
+  // Function to create or update week
+  function setWeekGenre(finalGenreId) {
+    // Check if week exists
+    req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
       if (err) {
         console.error(err);
         return res.status(500).send('Database error');
       }
 
-      let genreId;
-      
-      if (genre) {
-        genreId = genre.id;
-        // Update times_used counter
-        req.db.run("UPDATE genres SET times_used = times_used + 1 WHERE id = ?", [genreId]);
-        insertOrUpdateWeek();
+      if (week) {
+        // Update existing week
+        req.db.run(
+          "UPDATE weeks SET genre_id = ?, phase = 'nomination' WHERE id = ?",
+          [finalGenreId, week.id],
+          (err) => {
+            if (err) {
+              console.error(err);
+              return res.status(500).send('Failed to update week');
+            }
+            res.redirect('/');
+          }
+        );
       } else {
-        // Create new genre if it doesn't exist
-        req.db.run("INSERT INTO genres (name, times_used) VALUES (?, 1)", [genreName], function(err) {
-          if (err) {
-            console.error(err);
+        // Create new week
+        req.db.run(
+          "INSERT INTO weeks (week_date, genre_id, phase) VALUES (?, ?, 'nomination')",
+          [weekDate, finalGenreId],
+          (err) => {
+            if (err) {
+              console.error(err);
+              return res.status(500).send('Failed to create week');
+            }
+            res.redirect('/');
+          }
+        );
+      }
+    });
+  }
+
+  // If custom genre, create it first
+  if (customGenre) {
+    req.db.run("INSERT INTO genres (name) VALUES (?)", [customGenre], function(err) {
+      if (err) {
+        // Maybe it exists already
+        req.db.get("SELECT id FROM genres WHERE name = ?", [customGenre], (err, genre) => {
+          if (err || !genre) {
             return res.status(500).send('Failed to create genre');
           }
-          genreId = this.lastID;
-          insertOrUpdateWeek();
+          setWeekGenre(genre.id);
         });
-      }
-
-      function insertOrUpdateWeek() {
-        // Check if week already exists
-        req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, existingWeek) => {
-          if (err) {
-            console.error(err);
-            return res.status(500).send('Database error');
-          }
-
-          if (existingWeek) {
-            // Update existing week
-            req.db.run(
-              `UPDATE weeks SET genre_id = ?, genre_setter_id = ?, phase = 'nomination', phase_changed_at = CURRENT_TIMESTAMP 
-               WHERE week_date = ?`,
-              [genreId, setterId, weekDate],
-              function(err) {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).send('Database error');
-                }
-                console.log('Week updated with genre:', genreName);
-                res.redirect('/');
-              }
-            );
-          } else {
-            // Insert new week
-            req.db.run(
-              `INSERT INTO weeks (week_date, genre_id, genre_setter_id, phase) 
-               VALUES (?, ?, ?, 'nomination')`,
-              [weekDate, genreId, setterId],
-              function(err) {
-                if (err) {
-                  console.error(err);
-                  return res.status(500).send('Database error');
-                }
-                console.log('Week created with genre:', genreName);
-                res.redirect('/');
-              }
-            );
-          }
-        });
+      } else {
+        setWeekGenre(this.lastID);
       }
     });
-  });
-});
-
-// RANDOM GENRE ENDPOINT
-router.get('/random-genre/:date', (req, res) => {
-  const weekDate = req.params.date;
-  const currentUser = req.query.user || 'Unknown';
-  
-  // Get genres from database and pick random one
-  getGenres((err, genres) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).send('Database error');
-    }
-
-    if (genres.length === 0) {
-      return res.status(400).send('No genres available. Please add some genres first.');
-    }
-
-    const randomGenre = genres[Math.floor(Math.random() * genres.length)];
-    
-    // Get member ID for setter
-    req.db.get("SELECT id FROM members WHERE name = ?", [currentUser], (err, member) => {
-      if (err) {
-        console.error('Error finding member:', err);
-      }
-      
-      const setterId = member ? member.id : null;
-
-      // Check if week exists
-      req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, existingWeek) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).send('Database error');
-        }
-
-        if (existingWeek) {
-          // Update existing week
-          req.db.run(
-            `UPDATE weeks SET genre_id = ?, genre_setter_id = ?, phase = 'nomination', phase_changed_at = CURRENT_TIMESTAMP 
-             WHERE week_date = ?`,
-            [randomGenre.id, setterId, weekDate],
-            function(err) {
-              if (err) {
-                console.error(err);
-                return res.status(500).send('Database error');
-              }
-              
-              // Update genre usage count
-              req.db.run("UPDATE genres SET times_used = times_used + 1 WHERE id = ?", [randomGenre.id]);
-              
-              res.redirect('/');
-            }
-          );
-        } else {
-          // Create new week
-          req.db.run(
-            `INSERT INTO weeks (week_date, genre_id, genre_setter_id, phase) 
-             VALUES (?, ?, ?, 'nomination')`,
-            [weekDate, randomGenre.id, setterId],
-            function(err) {
-              if (err) {
-                console.error(err);
-                return res.status(500).send('Database error');
-              }
-              
-              // Update genre usage count
-              req.db.run("UPDATE genres SET times_used = times_used + 1 WHERE id = ?", [randomGenre.id]);
-              
-              res.redirect('/');
-            }
-          );
-        }
-      });
-    });
-  });
+  } else {
+    setWeekGenre(genreId);
+  }
 });
 
 module.exports = router;
