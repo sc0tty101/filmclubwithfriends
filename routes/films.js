@@ -5,7 +5,7 @@ const router = express.Router();
 const { getOrCreateFilm } = require('../database/setup');
 
 // TMDB API configuration
-const TMDB_API_KEY = 'cde76a7a245e3ba8dbaaeb37ac96e6f6';
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
 // API ROUTES - Server-side TMDB proxy endpoints
