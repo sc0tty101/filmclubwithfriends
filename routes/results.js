@@ -1,20 +1,20 @@
-// routes/results.js - Simplified results display
+// routes/results.js - Final results display (complete phase only)
 const express = require('express');
 const router = express.Router();
 
-// View results page
+// View results page - only for completed weeks
 router.get('/results/:date', (req, res) => {
   const weekDate = req.params.date;
 
-  // Get week info
+  // Get week info - ONLY for complete phase
   req.db.get(`
     SELECT w.*, g.name as genre_name
     FROM weeks w
     LEFT JOIN genres g ON w.genre_id = g.id
-    WHERE w.week_date = ? AND w.phase IN ('voting', 'complete')
+    WHERE w.week_date = ? AND w.phase = 'complete'
   `, [weekDate], (err, week) => {
     if (err || !week) {
-      return res.status(404).send('Results not available for this week');
+      return res.status(404).send('Results not available for this week - voting may still be in progress');
     }
 
     // Get all nominations with their vote totals
@@ -72,14 +72,14 @@ router.get('/results/:date', (req, res) => {
           <!DOCTYPE html>
           <html>
           <head>
-            <title>Results - Film Club</title>
+            <title>Final Results - Film Club</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <link rel="stylesheet" href="/styles/main.css">
           </head>
           <body>
             <div class="container">
               <div class="header">
-                <h1>🏆 Week Results</h1>
+                <h1>🏆 Final Results</h1>
                 <p>Week of ${new Date(weekDate).toLocaleDateString()}</p>
                 <p><strong>Genre: ${week.genre_name}</strong></p>
               </div>
@@ -135,21 +135,10 @@ router.get('/results/:date', (req, res) => {
               ` : `
                 <div class="card">
                   <p style="text-align: center; color: #999;">
-                    No votes have been submitted yet. Results will appear once voting is complete.
+                    No votes were submitted for this week.
                   </p>
                 </div>
               `}
-
-              <!-- Calculate Results Button (if in voting phase) -->
-              ${week.phase === 'voting' ? `
-                <div class="card">
-                  <h2>Calculate Results</h2>
-                  <p>All votes are in? Calculate the winner!</p>
-                  <form action="/calculate-results/${weekDate}" method="POST">
-                    <button type="submit" class="btn btn-primary">Calculate Results</button>
-                  </form>
-                </div>
-              ` : ''}
 
               <div class="actions center">
                 <a href="/" class="btn btn-secondary">Back to Calendar</a>
@@ -159,26 +148,6 @@ router.get('/results/:date', (req, res) => {
           </html>
         `);
       });
-    });
-  });
-});
-
-// Calculate results endpoint
-router.post('/calculate-results/:date', (req, res) => {
-  const weekDate = req.params.date;
-
-  req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
-    if (err || !week) {
-      return res.status(404).send('Week not found');
-    }
-
-    const dbHelpers = require('../database/setup');
-    dbHelpers.calculateResults(week.id, (err, winner) => {
-      if (err) {
-        console.error('Calculate results error:', err);
-        return res.status(500).send('Failed to calculate results');
-      }
-      res.redirect(`/results/${weekDate}`);
     });
   });
 });
