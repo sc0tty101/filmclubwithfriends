@@ -1,4 +1,4 @@
-// routes/films.js - Updated with server-side TMDB API
+// routes/films.js - Updated with server-side TMDB API and admin controls
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
@@ -60,7 +60,7 @@ router.get('/api/film/:id', async (req, res) => {
   }
 });
 
-// PAGE ROUTES - Existing nomination page
+// PAGE ROUTES - Nomination page and phase transitions
 
 // Nomination page
 router.get('/nominate/:date', (req, res) => {
@@ -95,189 +95,201 @@ router.get('/nominate/:date', (req, res) => {
       // Check if current user already nominated
       const userNominated = nominations.some(n => n.nominator === currentUser);
 
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Nominate Film - Film Club</title>
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <link rel="stylesheet" href="/styles/main.css">
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>🎬 Nominate a Film</h1>
-              <p>Week of ${new Date(weekDate).toLocaleDateString()}</p>
-              <p><strong>Genre: ${week.genre_name}</strong></p>
-            </div>
+      // Check if current user is admin
+      req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUser], (err, member) => {
+        const isAdmin = member && member.is_admin;
 
-            <!-- Current Nominations -->
-            <div class="card">
-              <h2>Current Nominations (${nominations.length})</h2>
-              ${nominations.length === 0 ? 
-                '<p style="text-align: center; color: #999;">No nominations yet</p>' :
-                nominations.map(nom => `
-                  <div class="film-card">
-                    ${nom.poster_url ? 
-                      `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="film-poster">` :
-                      '<div class="poster-placeholder">No poster</div>'
-                    }
-                    <div>
-                      <strong>${nom.title}</strong> ${nom.year ? `(${nom.year})` : ''}<br>
-                      <small>Nominated by ${nom.nominator}</small>
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Nominate Film - Film Club</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <link rel="stylesheet" href="/styles/main.css">
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1>🎬 Nominate a Film</h1>
+                <p>Week of ${new Date(weekDate).toLocaleDateString()}</p>
+                <p><strong>Genre: ${week.genre_name}</strong></p>
+              </div>
+
+              <!-- Current Nominations -->
+              <div class="card">
+                <h2>Current Nominations (${nominations.length})</h2>
+                ${nominations.length === 0 ? 
+                  '<p style="text-align: center; color: #999;">No nominations yet</p>' :
+                  nominations.map(nom => `
+                    <div class="film-card">
+                      ${nom.poster_url ? 
+                        `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="film-poster">` :
+                        '<div class="poster-placeholder">No poster</div>'
+                      }
+                      <div>
+                        <strong>${nom.title}</strong> ${nom.year ? `(${nom.year})` : ''}<br>
+                        <small>Nominated by ${nom.nominator}</small>
+                      </div>
+                      <div style="clear: both;"></div>
                     </div>
-                    <div style="clear: both;"></div>
+                  `).join('')
+                }
+                
+                ${nominations.length >= 3 && week.phase === 'nomination' && isAdmin ? `
+                  <div class="actions center">
+                    <form action="/begin-voting/${weekDate}" method="POST">
+                      <input type="hidden" name="user" value="${currentUser}">
+                      <button type="submit" class="btn btn-warning">Begin Voting</button>
+                    </form>
                   </div>
-                `).join('')
-              }
-              
-              ${nominations.length >= 3 && week.phase === 'nomination' ? `
-                <div class="actions center">
-                  <form action="/move-to-voting/${weekDate}" method="POST">
-                    <button type="submit" class="btn btn-warning">Move to Voting Phase</button>
+                ` : ''}
+              </div>
+
+              <!-- Nomination Form -->
+              ${currentUser && !userNominated && week.phase === 'nomination' ? `
+                <div class="card">
+                  <h2>Nominate Your Film</h2>
+                  <form onsubmit="return false;">
+                    <div class="form-group">
+                      <label>Search for a film:</label>
+                      <input type="text" id="filmSearch" placeholder="Enter film title...">
+                      <button type="button" onclick="searchFilms()" class="btn btn-primary">Search</button>
+                    </div>
                   </form>
+                  
+                  <div id="searchResults"></div>
+                  
+                  <div id="selectedFilm" style="display: none;">
+                    <h3>Selected Film:</h3>
+                    <div id="selectedDetails"></div>
+                    <form action="/nominate/${weekDate}" method="POST" id="nominateForm">
+                      <input type="hidden" name="user" value="${currentUser}">
+                      <input type="hidden" name="tmdbId" id="tmdbId">
+                      <input type="hidden" name="title" id="title">
+                      <input type="hidden" name="year" id="year">
+                      <input type="hidden" name="posterUrl" id="posterUrl">
+                      <input type="hidden" name="director" id="director">
+                      <input type="hidden" name="runtime" id="runtime">
+                      <input type="hidden" name="rating" id="rating">
+                      <input type="hidden" name="overview" id="overview">
+                      <button type="submit" class="btn btn-success">Confirm Nomination</button>
+                    </form>
+                  </div>
+                </div>
+              ` : !currentUser ? `
+                <div class="card">
+                  <p style="text-align: center; color: #999;">
+                    Please select your name at the top of the page to nominate
+                  </p>
+                </div>
+              ` : userNominated ? `
+                <div class="card">
+                  <p style="text-align: center; color: #999;">
+                    You have already nominated a film for this week
+                  </p>
+                </div>
+              ` : week.phase !== 'nomination' ? `
+                <div class="card">
+                  <p style="text-align: center; color: #999;">
+                    Nomination phase has ended for this week
+                  </p>
                 </div>
               ` : ''}
+
+              <div class="actions center">
+                <a href="/" class="btn btn-secondary">Back to Calendar</a>
+              </div>
             </div>
 
-            <!-- Nomination Form -->
-            ${currentUser && !userNominated && week.phase === 'nomination' ? `
-              <div class="card">
-                <h2>Nominate Your Film</h2>
-                <form onsubmit="return false;">
-                  <div class="form-group">
-                    <label>Search for a film:</label>
-                    <input type="text" id="filmSearch" placeholder="Enter film title...">
-                    <button type="button" onclick="searchFilms()" class="btn btn-primary">Search</button>
-                  </div>
-                </form>
-                
-                <div id="searchResults"></div>
-                
-                <div id="selectedFilm" style="display: none;">
-                  <h3>Selected Film:</h3>
-                  <div id="selectedDetails"></div>
-                  <form action="/nominate/${weekDate}" method="POST" id="nominateForm">
-                    <input type="hidden" name="user" value="${currentUser}">
-                    <input type="hidden" name="tmdbId" id="tmdbId">
-                    <input type="hidden" name="title" id="title">
-                    <input type="hidden" name="year" id="year">
-                    <input type="hidden" name="posterUrl" id="posterUrl">
-                    <input type="hidden" name="director" id="director">
-                    <input type="hidden" name="runtime" id="runtime">
-                    <input type="hidden" name="rating" id="rating">
-                    <input type="hidden" name="overview" id="overview">
-                    <button type="submit" class="btn btn-success">Confirm Nomination</button>
-                  </form>
-                </div>
-              </div>
-            ` : !currentUser ? `
-              <div class="card">
-                <p style="text-align: center; color: #999;">
-                  Please select your name at the top of the page to nominate
-                </p>
-              </div>
-            ` : userNominated ? `
-              <div class="card">
-                <p style="text-align: center; color: #999;">
-                  You have already nominated a film for this week
-                </p>
-              </div>
-            ` : ''}
-
-            <div class="actions center">
-              <a href="/" class="btn btn-secondary">Back to Calendar</a>
-            </div>
-          </div>
-
-          <script>
-            // Updated to use server-side API endpoints
-            
-            async function searchFilms() {
-              const query = document.getElementById('filmSearch').value;
-              if (!query) return;
+            <script>
+              // Updated to use server-side API endpoints
               
-              // Show loading state
-              document.getElementById('searchResults').innerHTML = '<p>Searching...</p>';
-              
-              try {
-                const response = await fetch('/api/search-films?query=' + encodeURIComponent(query));
-                const data = await response.json();
+              async function searchFilms() {
+                const query = document.getElementById('filmSearch').value;
+                if (!query) return;
                 
-                if (!response.ok) {
-                  throw new Error(data.error || 'Search failed');
+                // Show loading state
+                document.getElementById('searchResults').innerHTML = '<p>Searching...</p>';
+                
+                try {
+                  const response = await fetch('/api/search-films?query=' + encodeURIComponent(query));
+                  const data = await response.json();
+                  
+                  if (!response.ok) {
+                    throw new Error(data.error || 'Search failed');
+                  }
+                  
+                  const results = document.getElementById('searchResults');
+                  
+                  if (data.results && data.results.length > 0) {
+                    results.innerHTML = '<div class="search-results">' +
+                      data.results.slice(0, 5).map(film => \`
+                        <div class="search-result-item" onclick="selectFilm(\${film.id})">
+                          <strong>\${film.title}</strong> 
+                          \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}
+                          <br>
+                          <small>\${film.overview ? film.overview.substring(0, 100) + '...' : ''}</small>
+                        </div>
+                      \`).join('') + '</div>';
+                  } else {
+                    results.innerHTML = '<p>No results found</p>';
+                  }
+                } catch (error) {
+                  console.error('Search error:', error);
+                  document.getElementById('searchResults').innerHTML = 
+                    '<p style="color: red;">Search failed: ' + error.message + '</p>';
                 }
-                
-                const results = document.getElementById('searchResults');
-                
-                if (data.results && data.results.length > 0) {
-                  results.innerHTML = '<div class="search-results">' +
-                    data.results.slice(0, 5).map(film => \`
-                      <div class="search-result-item" onclick="selectFilm(\${film.id})">
+              }
+              
+              async function selectFilm(tmdbId) {
+                try {
+                  const response = await fetch('/api/film/' + tmdbId);
+                  const film = await response.json();
+                  
+                  if (!response.ok) {
+                    throw new Error(film.error || 'Failed to load film details');
+                  }
+                  
+                  document.getElementById('selectedFilm').style.display = 'block';
+                  document.getElementById('searchResults').innerHTML = '';
+                  
+                  const director = film.credits?.crew?.find(c => c.job === 'Director');
+                  
+                  document.getElementById('selectedDetails').innerHTML = \`
+                    <div class="film-card">
+                      \${film.poster_path ? 
+                        '<img src="https://image.tmdb.org/t/p/w92' + film.poster_path + '" class="film-poster">' :
+                        '<div class="poster-placeholder">No poster</div>'
+                      }
+                      <div>
                         <strong>\${film.title}</strong> 
-                        \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}
-                        <br>
-                        <small>\${film.overview ? film.overview.substring(0, 100) + '...' : ''}</small>
+                        \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}<br>
+                        \${director ? 'Director: ' + director.name + '<br>' : ''}
+                        \${film.runtime ? 'Runtime: ' + film.runtime + ' mins<br>' : ''}
+                        \${film.vote_average ? 'Rating: ' + film.vote_average + '/10' : ''}
                       </div>
-                    \`).join('') + '</div>';
-                } else {
-                  results.innerHTML = '<p>No results found</p>';
-                }
-              } catch (error) {
-                console.error('Search error:', error);
-                document.getElementById('searchResults').innerHTML = 
-                  '<p style="color: red;">Search failed: ' + error.message + '</p>';
-              }
-            }
-            
-            async function selectFilm(tmdbId) {
-              try {
-                const response = await fetch('/api/film/' + tmdbId);
-                const film = await response.json();
-                
-                if (!response.ok) {
-                  throw new Error(film.error || 'Failed to load film details');
-                }
-                
-                document.getElementById('selectedFilm').style.display = 'block';
-                document.getElementById('searchResults').innerHTML = '';
-                
-                const director = film.credits?.crew?.find(c => c.job === 'Director');
-                
-                document.getElementById('selectedDetails').innerHTML = \`
-                  <div class="film-card">
-                    \${film.poster_path ? 
-                      '<img src="https://image.tmdb.org/t/p/w92' + film.poster_path + '" class="film-poster">' :
-                      '<div class="poster-placeholder">No poster</div>'
-                    }
-                    <div>
-                      <strong>\${film.title}</strong> 
-                      \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}<br>
-                      \${director ? 'Director: ' + director.name + '<br>' : ''}
-                      \${film.runtime ? 'Runtime: ' + film.runtime + ' mins<br>' : ''}
-                      \${film.vote_average ? 'Rating: ' + film.vote_average + '/10' : ''}
+                      <div style="clear: both;"></div>
                     </div>
-                    <div style="clear: both;"></div>
-                  </div>
-                \`;
-                
-                document.getElementById('tmdbId').value = film.id;
-                document.getElementById('title').value = film.title;
-                document.getElementById('year').value = film.release_date ? film.release_date.substring(0, 4) : '';
-                document.getElementById('posterUrl').value = film.poster_path || '';
-                document.getElementById('director').value = director ? director.name : '';
-                document.getElementById('runtime').value = film.runtime || '';
-                document.getElementById('rating').value = film.vote_average || '';
-                document.getElementById('overview').value = film.overview || '';
-              } catch (error) {
-                console.error('Film details error:', error);
-                alert('Failed to load film details: ' + error.message);
+                  \`;
+                  
+                  document.getElementById('tmdbId').value = film.id;
+                  document.getElementById('title').value = film.title;
+                  document.getElementById('year').value = film.release_date ? film.release_date.substring(0, 4) : '';
+                  document.getElementById('posterUrl').value = film.poster_path || '';
+                  document.getElementById('director').value = director ? director.name : '';
+                  document.getElementById('runtime').value = film.runtime || '';
+                  document.getElementById('rating').value = film.vote_average || '';
+                  document.getElementById('overview').value = film.overview || '';
+                } catch (error) {
+                  console.error('Film details error:', error);
+                  alert('Failed to load film details: ' + error.message);
+                }
               }
-            }
-          </script>
-        </body>
-        </html>
-      `);
+            </script>
+          </body>
+          </html>
+        `);
+      });
     });
   });
 });
@@ -344,20 +356,53 @@ router.post('/nominate/:date', (req, res) => {
   });
 });
 
-// Move to voting phase
+// Begin voting phase (admin only)
+router.post('/begin-voting/:date', (req, res) => {
+  const weekDate = req.params.date;
+  const currentUser = req.query.user || req.body.user;
+  
+  // Check if user is admin
+  req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUser], (err, member) => {
+    if (err || !member || !member.is_admin) {
+      return res.status(403).send('Admin access required');
+    }
+    
+    // Update phase to voting
+    req.db.run(
+      "UPDATE weeks SET phase = 'voting' WHERE week_date = ?",
+      [weekDate],
+      (err) => {
+        if (err) {
+          return res.status(500).send('Failed to begin voting');
+        }
+        res.redirect('/');
+      }
+    );
+  });
+});
+
+// Move to voting phase (admin only) - LEGACY route for existing buttons
 router.post('/move-to-voting/:date', (req, res) => {
   const weekDate = req.params.date;
+  const currentUser = req.query.user || req.body.user;
   
-  req.db.run(
-    "UPDATE weeks SET phase = 'voting' WHERE week_date = ?",
-    [weekDate],
-    (err) => {
-      if (err) {
-        return res.status(500).send('Failed to update phase');
-      }
-      res.redirect('/');
+  // Check if user is admin
+  req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUser], (err, member) => {
+    if (err || !member || !member.is_admin) {
+      return res.status(403).send('Admin access required');
     }
-  );
+    
+    req.db.run(
+      "UPDATE weeks SET phase = 'voting' WHERE week_date = ?",
+      [weekDate],
+      (err) => {
+        if (err) {
+          return res.status(500).send('Failed to update phase');
+        }
+        res.redirect('/');
+      }
+    );
+  });
 });
 
 module.exports = router;
