@@ -144,6 +144,7 @@ router.get('/', (req, res) => {
                     <a href="/nominate/${currentWeek.date}" class="btn btn-success">Nominate Film</a>
                   ` : currentWeek.phase === 'voting' ? `
                     <a href="/vote/${currentWeek.date}" class="btn btn-warning">Vote Now</a>
+                    <a href="/results/${currentWeek.date}" class="btn btn-secondary">View Results</a>
                   ` : currentWeek.phase === 'complete' ? `
                     <a href="/results/${currentWeek.date}" class="btn btn-secondary">View Results</a>
                   ` : ''}
@@ -172,6 +173,7 @@ router.get('/', (req, res) => {
                       <a href="/nominate/${week.date}" class="btn btn-success btn-small">Nominate</a>
                     ` : week.phase === 'voting' ? `
                       <a href="/vote/${week.date}" class="btn btn-warning btn-small">Vote</a>
+                      <a href="/results/${week.date}" class="btn btn-secondary btn-small">Results</a>
                     ` : week.phase === 'complete' ? `
                       <a href="/results/${week.date}" class="btn btn-secondary btn-small">Results</a>
                     ` : ''}
