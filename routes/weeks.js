@@ -35,7 +35,7 @@ router.get('/set-genre/:date', (req, res) => {
               
               <div class="form-group">
                 <label>Choose Genre:</label>
-                <select name="genre" id="genreSelect">
+                <select name="genre" id="genreSelect" autofocus aria-label="Choose genre">
                   <option value="">Select a genre...</option>
                   ${genres.map(genre => 
                     `<option value="${genre.id}">${genre.name}</option>`
@@ -46,13 +46,13 @@ router.get('/set-genre/:date', (req, res) => {
               <div class="form-group">
                 <label>Or enter custom genre:</label>
                 <input type="text" name="customGenre" id="customGenre" 
-                       placeholder="e.g., XMAS FILMS, 80s Movies">
+                       placeholder="e.g., XMAS FILMS, 80s Movies" aria-label="Custom genre">
               </div>
               
               <div class="actions">
                 <button type="submit" class="btn btn-primary">Set Genre</button>
-                <button type="button" class="btn btn-warning" onclick="setRandomGenre()">
-                  🎲 Random Genre
+                <button type="button" class="btn btn-warning" onclick="setRandomGenre()" id="randomBtn">
+                  <span id="randomSpinner" style="display:none;" class="spinner"></span>🎲 Random Genre
                 </button>
                 <a href="/" class="btn btn-secondary">Cancel</a>
               </div>
@@ -71,18 +71,43 @@ router.get('/set-genre/:date', (req, res) => {
           });
           
           function setRandomGenre() {
-            const select = document.getElementById('genreSelect');
-            const options = Array.from(select.options).filter(o => o.value);
-            if (options.length > 0) {
-              const random = options[Math.floor(Math.random() * options.length)];
-              select.value = random.value;
-              document.getElementById('customGenre').value = '';
-              document.querySelector('form').submit();
-            } else {
-              alert('No genres available!');
-            }
+            const btn = document.getElementById('randomBtn');
+            const spinner = document.getElementById('randomSpinner');
+            spinner.style.display = 'inline-block';
+            btn.disabled = true;
+            setTimeout(() => {
+              const select = document.getElementById('genreSelect');
+              const options = Array.from(select.options).filter(o => o.value);
+              if (options.length > 0) {
+                const random = options[Math.floor(Math.random() * options.length)];
+                select.value = random.value;
+                document.getElementById('customGenre').value = '';
+                document.querySelector('form').submit();
+              } else {
+                alert('No genres available!');
+              }
+              spinner.style.display = 'none';
+              btn.disabled = false;
+            }, 400);
           }
         </script>
+        <style>
+          .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #dbeafe;
+            border-top: 2px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: middle;
+            margin-right: 4px;
+          }
+          @keyframes spin {
+            0% { transform: rotate(0deg);}
+            100% { transform: rotate(360deg);}
+          }
+        </style>
       </body>
       </html>
     `);

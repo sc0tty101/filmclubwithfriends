@@ -97,8 +97,8 @@ router.get('/', (req, res) => {
           <div class="container">
             <!-- User selector -->
             <div class="user-select">
-              <label>Current user:</label>
-              <select id="currentUser" onchange="updateUser()">
+              <label for="currentUser">Current user:</label>
+              <select id="currentUser" aria-label="Select current user" onchange="updateUser()">
                 <option value="">Select...</option>
                 ${members.map(m => `<option value="${m.name}" data-admin="${m.is_admin}">${m.name}${m.is_admin ? ' (Admin)' : ''}</option>`).join('')}
               </select>
@@ -111,9 +111,9 @@ router.get('/', (req, res) => {
 
             <!-- Navigation -->
             <div class="nav-buttons">
-              <a href="/manage-members" class="btn btn-secondary admin-only" style="display: none;">Manage Members</a>
-              <a href="/manage-genres" class="btn btn-secondary admin-only" style="display: none;">Manage Genres</a>
-              <a href="/admin" class="btn btn-secondary admin-only" style="display: none;">Admin</a>
+              <a href="/manage-members" class="btn btn-secondary admin-only" style="display: none;" title="Admins only">Manage Members</a>
+              <a href="/manage-genres" class="btn btn-secondary admin-only" style="display: none;" title="Admins only">Manage Genres</a>
+              <a href="/admin" class="btn btn-secondary admin-only" style="display: none;" title="Admins only">Admin</a>
             </div>
 
             <!-- Current Week -->
@@ -227,6 +227,11 @@ router.get('/', (req, res) => {
               const user = select.value;
               const selectedOption = select.options[select.selectedIndex];
               const isAdmin = selectedOption ? selectedOption.dataset.admin === '1' : false;
+              
+              // Highlight selected user
+              Array.from(select.options).forEach(opt => {
+                opt.style.background = opt.value === user ? '#dbeafe' : '';
+              });
               
               if (user) {
                 localStorage.setItem('currentUser', user);

@@ -80,7 +80,7 @@ router.get('/nominate/:date', (req, res) => {
 
     // Get existing nominations
     req.db.all(`
-      SELECT n.id, f.title, f.year, f.poster_url, m.name as nominator
+      SELECT n.id, f.title, f.year, f.poster_url, m.name as nominator, f.director, f.runtime, f.tmdb_rating, f.overview
       FROM nominations n
       JOIN films f ON n.film_id = f.id
       JOIN members m ON n.member_id = m.id
@@ -123,14 +123,33 @@ router.get('/nominate/:date', (req, res) => {
                   nominations.map(nom => `
                     <div class="film-card">
                       ${nom.poster_url ? 
-                        `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="film-poster">` :
-                        '<div class="poster-placeholder">No poster</div>'
+                        `<img src="https://image.tmdb.org/t/p/w185${nom.poster_url}" class="film-poster" alt="Poster for ${nom.title}">` :
+                        `<div class="poster-placeholder" aria-label="No poster">
+                          <svg width="40" height="60" viewBox="0 0 40 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="40" height="60" rx="6" fill="#e5e7eb"/>
+                            <path d="M10 40l7-10 7 10 6-8 7 12H3l7-12z" fill="#cbd5e1"/>
+                          </svg>
+                        </div>`
                       }
-                      <div>
-                        <strong>${nom.title}</strong> ${nom.year ? `(${nom.year})` : ''}<br>
-                        <small>Nominated by ${nom.nominator}</small>
+                      <div class="film-details">
+                        <div class="film-title">${nom.title}${nom.year ? ` (${nom.year})` : ''}</div>
+                        <div class="film-meta">
+                          ${nom.director ? `<span title="Director">
+                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a2 2 0 110 4 2 2 0 010-4zm0 5c2.21 0 4 1.79 4 4v1H4v-1c0-2.21 1.79-4 4-4z"/></svg>
+                            ${nom.director}
+                          </span>` : ''}
+                          ${nom.runtime ? `<span title="Runtime">
+                            <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 4v4l3 2" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                            ${nom.runtime} min
+                          </span>` : ''}
+                          ${nom.tmdb_rating ? `<span title="TMDB Rating">
+                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4.472 2.951 1.705-5.254L1 6.549l5.528-.004L8 1.5l1.472 5.045 5.528.004-4.233 3.148 1.705 5.254z"/></svg>
+                            ${nom.tmdb_rating}/10
+                          </span>` : ''}
+                        </div>
+                        ${nom.overview ? `<div class="film-overview">${nom.overview.length > 140 ? nom.overview.substring(0, 140) + '…' : nom.overview}</div>` : ''}
+                        <div class="nominator">Nominated by ${nom.nominator}</div>
                       </div>
-                      <div style="clear: both;"></div>
                     </div>
                   `).join('')
                 }
@@ -209,7 +228,7 @@ router.get('/nominate/:date', (req, res) => {
                 if (!query) return;
                 
                 // Show loading state
-                document.getElementById('searchResults').innerHTML = '<p>Searching...</p>';
+                document.getElementById('searchResults').innerHTML = '<div style="text-align:center;"><span class="spinner"></span> Searching...</div>';
                 
                 try {
                   const response = await fetch('/api/search-films?query=' + encodeURIComponent(query));
@@ -280,12 +299,60 @@ router.get('/nominate/:date', (req, res) => {
                   document.getElementById('runtime').value = film.runtime || '';
                   document.getElementById('rating').value = film.vote_average || '';
                   document.getElementById('overview').value = film.overview || '';
+                  
+                  document.getElementById('selectedDetails').innerHTML += '<button type="button" class="btn btn-secondary btn-small" onclick="clearSelection()">Clear Selection</button>';
                 } catch (error) {
                   console.error('Film details error:', error);
                   alert('Failed to load film details: ' + error.message);
                 }
               }
+              function clearSelection() {
+                document.getElementById('selectedFilm').style.display = 'none';
+                document.getElementById('selectedDetails').innerHTML = '';
+                document.getElementById('filmSearch').value = '';
+              }
+              // Keyboard navigation for search results
+              document.getElementById('filmSearch').addEventListener('keydown', function(e) {
+                const results = document.querySelectorAll('.search-result-item');
+                if (!results.length) return;
+                let idx = Array.from(results).findIndex(r => r.classList.contains('active'));
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  if (idx >= 0) results[idx].classList.remove('active');
+                  idx = (idx + 1) % results.length;
+                  results[idx].classList.add('active');
+                  results[idx].scrollIntoView({block: 'nearest'});
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  if (idx >= 0) results[idx].classList.remove('active');
+                  idx = (idx - 1 + results.length) % results.length;
+                  results[idx].classList.add('active');
+                  results[idx].scrollIntoView({block: 'nearest'});
+                } else if (e.key === 'Enter' && idx >= 0) {
+                  results[idx].click();
+                }
+              });
             </script>
+            <style>
+              .spinner {
+                display: inline-block;
+                width: 20px;
+                height: 20px;
+                border: 3px solid #dbeafe;
+                border-top: 3px solid #2563eb;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                vertical-align: middle;
+                margin-right: 8px;
+              }
+              @keyframes spin {
+                0% { transform: rotate(0deg);}
+                100% { transform: rotate(360deg);}
+              }
+              .search-result-item.active {
+                background: #dbeafe;
+              }
+            </style>
           </body>
           </html>
         `);

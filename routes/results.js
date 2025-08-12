@@ -99,36 +99,49 @@ router.get('/results/:date', (req, res) => {
                 <div class="card">
                   <h2>Final Rankings</h2>
                   ${nominations.map((nom, index) => `
-                    <div style="margin-bottom: 20px; padding: 15px; background: ${index === 0 ? '#fef3c7' : '#f9fafb'}; border-radius: 8px;">
-                      <div style="display: flex; align-items: start; gap: 15px;">
-                        <div style="font-size: 24px; font-weight: bold; color: ${index === 0 ? '#f59e0b' : '#6b7280'};">
-                          #${index + 1}
+                    <div class="film-card${index === 0 ? ' winner' : ''}">
+                      ${nom.poster_url ? 
+                        `<img src="https://image.tmdb.org/t/p/w185${nom.poster_url}" class="film-poster" alt="Poster for ${nom.title}">` :
+                        `<div class="poster-placeholder" aria-label="No poster">
+                          <svg width="40" height="60" viewBox="0 0 40 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="40" height="60" rx="6" fill="#e5e7eb"/>
+                            <path d="M10 40l7-10 7 10 6-8 7 12H3l7-12z" fill="#cbd5e1"/>
+                          </svg>
+                        </div>`
+                      }
+                      <div class="film-details">
+                        <div class="film-title">${nom.title}${nom.year ? ` (${nom.year})` : ''}</div>
+                        <div class="film-meta">
+                          ${nom.director ? `<span title="Director">
+                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a2 2 0 110 4 2 2 0 010-4zm0 5c2.21 0 4 1.79 4 4v1H4v-1c0-2.21 1.79-4 4-4z"/></svg>
+                            ${nom.director}
+                          </span>` : ''}
+                          ${nom.runtime ? `<span title="Runtime">
+                            <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M8 4v4l3 2" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                            ${nom.runtime} min
+                          </span>` : ''}
+                          ${nom.tmdb_rating ? `<span title="TMDB Rating">
+                            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 12l-4.472 2.951 1.705-5.254L1 6.549l5.528-.004L8 1.5l1.472 5.045 5.528.004-4.233 3.148 1.705 5.254z"/></svg>
+                            ${nom.tmdb_rating}/10
+                          </span>` : ''}
                         </div>
-                        ${nom.poster_url ? 
-                          `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="film-poster">` :
-                          '<div class="poster-placeholder">No poster</div>'
-                        }
-                        <div style="flex: 1;">
-                          <h3 style="margin: 0 0 5px 0;">${nom.title} ${nom.year ? `(${nom.year})` : ''}</h3>
-                          <p style="margin: 5px 0;">Nominated by ${nom.nominator}</p>
-                          ${nom.director ? `<p style="margin: 5px 0;"><small>Director: ${nom.director}</small></p>` : ''}
-                          <p style="margin: 10px 0;">
-                            <strong>${nom.total_points} points</strong> 
-                            ${nom.vote_count > 0 ? `from ${nom.vote_count} votes` : '(no votes)'}
-                          </p>
+                        ${nom.overview ? `<div class="film-overview">${nom.overview.length > 140 ? nom.overview.substring(0, 140) + '…' : nom.overview}</div>` : ''}
+                        <div class="nominator">Nominated by ${nom.nominator}</div>
+                        <div style="margin-top: 8px;">
+                          <strong>${nom.total_points} points</strong> 
+                          ${nom.vote_count > 0 ? `from ${nom.vote_count} votes` : '(no votes)'}
                         </div>
+                        ${votesByNomination[nom.id] && votesByNomination[nom.id].length > 0 ? `
+                          <div class="vote-breakdown">
+                            <strong>Votes:</strong>
+                            ${votesByNomination[nom.id].map(v => 
+                              `<span style="display: inline-block; margin: 5px; padding: 5px 10px; background: white; border-radius: 5px;">
+                                ${v.voter}: #${v.rank} (${v.points}pts)
+                              </span>`
+                            ).join('')}
+                          </div>
+                        ` : ''}
                       </div>
-                      
-                      ${votesByNomination[nom.id] && votesByNomination[nom.id].length > 0 ? `
-                        <div class="vote-breakdown">
-                          <strong>Votes:</strong>
-                          ${votesByNomination[nom.id].map(v => 
-                            `<span style="display: inline-block; margin: 5px; padding: 5px 10px; background: white; border-radius: 5px;">
-                              ${v.voter}: #${v.rank} (${v.points}pts)
-                            </span>`
-                          ).join('')}
-                        </div>
-                      ` : ''}
                     </div>
                   `).join('')}
                 </div>
