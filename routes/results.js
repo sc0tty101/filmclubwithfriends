@@ -11,7 +11,7 @@ router.get('/results/:date', (req, res) => {
     SELECT w.*, g.name as genre_name
     FROM weeks w
     LEFT JOIN genres g ON w.genre_id = g.id
-    WHERE w.week_date = ? AND w.phase = 'complete'
+    WHERE w.week_date = ? AND w.phase IN ('voting', 'complete')
   `, [weekDate], (err, week) => {
     if (err || !week) {
       return res.status(404).send('Results not available for this week');
