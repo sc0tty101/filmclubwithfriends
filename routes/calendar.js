@@ -1,10 +1,10 @@
-// routes/calendar.js - Simplified main homepage
+// routes/calendar.js - Updated with cleaner workflow
 const express = require('express');
 const router = express.Router();
 
 router.get('/', (req, res) => {
   // Get members for dropdown
-  req.db.all("SELECT id, name FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
+  req.db.all("SELECT id, name, is_admin FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
     if (err) {
       console.error('Members error:', err);
       members = [];
@@ -100,7 +100,7 @@ router.get('/', (req, res) => {
               <label>Current user:</label>
               <select id="currentUser" onchange="updateUser()">
                 <option value="">Select...</option>
-                ${members.map(m => `<option value="${m.name}">${m.name}</option>`).join('')}
+                ${members.map(m => `<option value="${m.name}" data-admin="${m.is_admin}">${m.name}${m.is_admin ? ' (Admin)' : ''}</option>`).join('')}
               </select>
             </div>
 
@@ -111,9 +111,9 @@ router.get('/', (req, res) => {
 
             <!-- Navigation -->
             <div class="nav-buttons">
-              <a href="/manage-members" class="btn btn-secondary">Manage Members</a>
-              <a href="/manage-genres" class="btn btn-secondary">Manage Genres</a>
-              <a href="/admin" class="btn btn-secondary">Admin</a>
+              <a href="/manage-members" class="btn btn-secondary admin-only" style="display: none;">Manage Members</a>
+              <a href="/manage-genres" class="btn btn-secondary admin-only" style="display: none;">Manage Genres</a>
+              <a href="/admin" class="btn btn-secondary admin-only" style="display: none;">Admin</a>
             </div>
 
             <!-- Current Week -->
@@ -142,9 +142,12 @@ router.get('/', (req, res) => {
                     <a href="/set-genre/${currentWeek.date}" class="btn btn-primary">Set Genre</a>
                   ` : currentWeek.phase === 'nomination' ? `
                     <a href="/nominate/${currentWeek.date}" class="btn btn-success">Nominate Film</a>
+                    ${currentWeek.nomination_count >= 3 ? `
+                      <a href="/begin-voting/${currentWeek.date}" class="btn btn-warning admin-only" style="display: none;">Begin Voting</a>
+                    ` : ''}
                   ` : currentWeek.phase === 'voting' ? `
                     <a href="/vote/${currentWeek.date}" class="btn btn-warning">Vote Now</a>
-                    <a href="/results/${currentWeek.date}" class="btn btn-secondary">View Results</a>
+                    <a href="/calculate-results/${currentWeek.date}" class="btn btn-primary admin-only" style="display: none;">Calculate Results</a>
                   ` : currentWeek.phase === 'complete' ? `
                     <a href="/results/${currentWeek.date}" class="btn btn-secondary">View Results</a>
                   ` : ''}
@@ -171,9 +174,12 @@ router.get('/', (req, res) => {
                       <a href="/set-genre/${week.date}" class="btn btn-primary btn-small">Set Genre</a>
                     ` : week.phase === 'nomination' ? `
                       <a href="/nominate/${week.date}" class="btn btn-success btn-small">Nominate</a>
+                      ${week.nomination_count >= 3 ? `
+                        <a href="/begin-voting/${week.date}" class="btn btn-warning btn-small admin-only" style="display: none;">Begin Voting</a>
+                      ` : ''}
                     ` : week.phase === 'voting' ? `
                       <a href="/vote/${week.date}" class="btn btn-warning btn-small">Vote</a>
-                      <a href="/results/${week.date}" class="btn btn-secondary btn-small">Results</a>
+                      <a href="/calculate-results/${week.date}" class="btn btn-primary btn-small admin-only" style="display: none;">Calculate Results</a>
                     ` : week.phase === 'complete' ? `
                       <a href="/results/${week.date}" class="btn btn-secondary btn-small">Results</a>
                     ` : ''}
@@ -213,18 +219,35 @@ router.get('/', (req, res) => {
             const savedUser = localStorage.getItem('currentUser');
             if (savedUser) {
               document.getElementById('currentUser').value = savedUser;
+              updateUser();
             }
 
             function updateUser() {
               const select = document.getElementById('currentUser');
               const user = select.value;
+              const selectedOption = select.options[select.selectedIndex];
+              const isAdmin = selectedOption ? selectedOption.dataset.admin === '1' : false;
+              
               if (user) {
                 localStorage.setItem('currentUser', user);
+                
+                // Show/hide admin elements
+                const adminElements = document.querySelectorAll('.admin-only');
+                adminElements.forEach(element => {
+                  element.style.display = isAdmin ? '' : 'none';
+                });
+                
                 // Add user to all links
                 document.querySelectorAll('a[href*="/nominate/"], a[href*="/vote/"], a[href*="/set-genre/"]').forEach(link => {
                   const url = new URL(link.href, window.location.origin);
                   url.searchParams.set('user', user);
                   link.href = url.toString();
+                });
+              } else {
+                // Hide all admin elements if no user selected
+                const adminElements = document.querySelectorAll('.admin-only');
+                adminElements.forEach(element => {
+                  element.style.display = 'none';
                 });
               }
             }
