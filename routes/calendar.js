@@ -1,3 +1,7 @@
+// Version: 1.0.0
+// Last Edited: 2024-06-09 20:10 UTC
+// Unique Message: 🌟 Calendar Page - Add Member Button Verified
+
 // routes/calendar.js - Updated with cleaner workflow
 const express = require('express');
 const router = express.Router();
@@ -114,6 +118,11 @@ router.get('/', (req, res) => {
               <a href="/manage-members" class="btn btn-secondary admin-only" style="display: none;" title="Admins only">Manage Members</a>
               <a href="/manage-genres" class="btn btn-secondary admin-only" style="display: none;" title="Admins only">Manage Genres</a>
               <a href="/admin" class="btn btn-secondary admin-only" style="display: none;" title="Admins only">Admin</a>
+            </div>
+
+            <!-- Add Member Button -->
+            <div class="actions center" style="margin-bottom: 2rem;">
+              <a href="/manage-members#add-member-form" class="btn btn-primary">Add Member</a>
             </div>
 
             <!-- Current Week -->

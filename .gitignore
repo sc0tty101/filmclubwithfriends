@@ -103,6 +103,7 @@ stats-cache/
 # Development database backups
 *.db.backup
 filmclub-backup-*.db
+.vscode/
 
 # Local development overrides
 local-config.js
