@@ -61,44 +61,6 @@ router.get('/vote/:date', (req, res) => {
                     <title>Vote - Film Club</title>
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <link rel="stylesheet" href="/styles/main.css">
-                    <style>
-                      .ranking-list {
-                        list-style: none;
-                        padding: 0;
-                      }
-                      .ranking-item {
-                        background: white;
-                        border: 1px solid #ddd;
-                        border-radius: 8px;
-                        padding: 15px;
-                        margin-bottom: 10px;
-                        cursor: move;
-                        display: flex;
-                        align-items: center;
-                        gap: 15px;
-                      }
-                      .ranking-item.dragging {
-                        opacity: 0.5;
-                      }
-                      .rank-number {
-                        background: #2563eb;
-                        color: white;
-                        width: 30px;
-                        height: 30px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        flex-shrink: 0;
-                      }
-                      .vote-status {
-                        background: #f0f0f0;
-                        padding: 10px;
-                        border-radius: 8px;
-                        margin-bottom: 20px;
-                      }
-                    </style>
                   </head>
                   <body>
                     <div class="container">
@@ -107,14 +69,30 @@ router.get('/vote/:date', (req, res) => {
                         <p>Week of ${new Date(weekDate).toLocaleDateString()}</p>
                         <p><strong>Genre: ${week.genre_name}</strong></p>
                       </div>
-
+                      <!-- Stepper -->
+                      <div class="stepper">
+                        <div class="step completed">
+                          <div class="step-circle">1</div>
+                          <span>Nomination</span>
+                        </div>
+                        <div class="step active">
+                          <div class="step-circle">2</div>
+                          <span>Voting</span>
+                        </div>
+                        <div class="step">
+                          <div class="step-circle">3</div>
+                          <span>Results</span>
+                        </div>
+                      </div>
                       <!-- Voting Status -->
                       <div class="card">
                         <div class="vote-status">
                           <strong>Voting Progress:</strong> ${voters.length} members have voted
-                          ${voters.length > 0 ? `<br><small>${voters.map(v => v.name).join(', ')}</small>` : ''}
+                          <div class="progress-bar" aria-label="Voting progress">
+                            <div class="progress-bar-inner" style="width: ${Math.min(100, voters.length * 12)}%"></div>
+                          </div>
+                          ${voters.length > 0 ? `<small>${voters.map(v => v.name).join(', ')}</small>` : ''}
                         </div>
-                        
                         ${isAdmin ? `
                           <div class="actions center" style="margin-top: 15px;">
                             <form action="/calculate-results/${weekDate}" method="POST">
@@ -124,20 +102,17 @@ router.get('/vote/:date', (req, res) => {
                           </div>
                         ` : ''}
                       </div>
-
                       ${currentUser && !hasVoted ? `
                         <!-- Voting Form -->
                         <div class="card">
                           <h2>Rank the Films</h2>
                           <p>Drag to reorder. Your top choice gets the most points!</p>
-                          
                           <form action="/vote/${weekDate}" method="POST" id="voteForm">
                             <input type="hidden" name="user" value="${currentUser}">
-                            
-                            <ul class="ranking-list" id="rankingList">
+                            <ul class="ranking-list" id="rankingList" style="list-style:none;padding:0;">
                               ${nominations.map((nom, index) => `
-                                <li class="ranking-item" draggable="true" data-id="${nom.id}">
-                                  <span class="rank-number">${index + 1}</span>
+                                <li class="ranking-item" draggable="true" data-id="${nom.id}" style="background:white;border:1px solid #ddd;border-radius:8px;padding:15px;margin-bottom:10px;cursor:move;display:flex;align-items:center;gap:15px;">
+                                  <span class="rank-number" style="background:var(--primary);color:white;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;flex-shrink:0;">${index + 1}</span>
                                   ${nom.poster_url ? 
                                     `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="film-poster">` :
                                     '<div class="poster-placeholder">No poster</div>'
@@ -150,9 +125,7 @@ router.get('/vote/:date', (req, res) => {
                                 </li>
                               `).join('')}
                             </ul>
-                            
                             <input type="hidden" name="rankings" id="rankings">
-                            
                             <div class="actions">
                               <button type="submit" class="btn btn-primary">Submit Vote</button>
                               <a href="/" class="btn btn-secondary">Cancel</a>
@@ -161,18 +134,13 @@ router.get('/vote/:date', (req, res) => {
                         </div>
                       ` : currentUser && hasVoted ? `
                         <div class="card">
-                          <p style="text-align: center; color: #999;">
-                            ✅ You have already voted for this week
-                          </p>
+                          <div class="alert alert-success" style="text-align:center;">✅ You have already voted for this week</div>
                         </div>
                       ` : `
                         <div class="card">
-                          <p style="text-align: center; color: #999;">
-                            Please select your name at the top of the page to vote
-                          </p>
+                          <div class="alert alert-error" style="text-align:center;">Please select your name at the top of the page to vote</div>
                         </div>
                       `}
-
                       <!-- Show all nominations for reference -->
                       <div class="card">
                         <h2>All Nominations</h2>
@@ -209,32 +177,26 @@ router.get('/vote/:date', (req, res) => {
                           </div>
                         `).join('')}
                       </div>
-
                       <div class="actions center">
                         <a href="/" class="btn btn-secondary">Back to Calendar</a>
                       </div>
                     </div>
-
                     <script>
                       // Drag and drop functionality
                       let draggedItem = null;
                       const list = document.getElementById('rankingList');
-                      
                       if (list) {
                         const items = list.querySelectorAll('.ranking-item');
-                        
                         items.forEach(item => {
                           item.addEventListener('dragstart', function(e) {
                             draggedItem = this;
                             this.classList.add('dragging');
                           });
-                          
                           item.addEventListener('dragend', function(e) {
                             this.classList.remove('dragging');
                             draggedItem = null;
                             updateRankNumbers();
                           });
-                          
                           item.addEventListener('dragover', function(e) {
                             e.preventDefault();
                             const afterElement = getDragAfterElement(list, e.clientY);
@@ -246,14 +208,11 @@ router.get('/vote/:date', (req, res) => {
                           });
                         });
                       }
-                      
                       function getDragAfterElement(container, y) {
                         const draggableElements = [...container.querySelectorAll('.ranking-item:not(.dragging)')];
-                        
                         return draggableElements.reduce((closest, child) => {
                           const box = child.getBoundingClientRect();
                           const offset = y - box.top - box.height / 2;
-                          
                           if (offset < 0 && offset > closest.offset) {
                             return { offset: offset, element: child };
                           } else {
@@ -261,14 +220,12 @@ router.get('/vote/:date', (req, res) => {
                           }
                         }, { offset: Number.NEGATIVE_INFINITY }).element;
                       }
-                      
                       function updateRankNumbers() {
                         const items = document.querySelectorAll('.ranking-item');
                         items.forEach((item, index) => {
                           item.querySelector('.rank-number').textContent = index + 1;
                         });
                       }
-                      
                       // Form submission
                       const form = document.getElementById('voteForm');
                       if (form) {
@@ -279,7 +236,6 @@ router.get('/vote/:date', (req, res) => {
                             nominationId: item.dataset.id,
                             rank: index + 1
                           }));
-                          
                           document.getElementById('rankings').value = JSON.stringify(rankings);
                           this.submit();
                         });

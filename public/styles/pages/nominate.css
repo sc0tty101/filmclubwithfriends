@@ -1,0 +1,22 @@
+/* Page-specific styles for nomination page */
+
+.nomination-form {
+  margin-bottom: var(--space-6);
+}
+.nomination-list {
+  margin-top: var(--space-4);
+}
+.nomination-item {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.nomination-item .film-title {
+  font-weight: 600;
+  color: var(--gray-900);
+}

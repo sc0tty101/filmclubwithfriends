@@ -1,0 +1,23 @@
+/* Page-specific styles for admin page */
+
+.admin-section {
+  margin-bottom: var(--space-8);
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-6);
+}
+.admin-table th, .admin-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--gray-200);
+  text-align: left;
+}
+.admin-table th {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  font-weight: 600;
+}
+.admin-table tr:last-child td {
+  border-bottom: none;
+}

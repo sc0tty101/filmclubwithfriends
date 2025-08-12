@@ -1,0 +1,38 @@
+/* Page-specific styles for voting, nomination, results, etc. */
+
+.ranking-list {
+  list-style: none;
+  padding: 0;
+}
+.ranking-item {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 10px;
+  cursor: move;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.ranking-item.dragging {
+  opacity: 0.5;
+}
+.rank-number {
+  background: var(--primary);
+  color: white;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+.vote-status {
+  background: var(--gray-100);
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}

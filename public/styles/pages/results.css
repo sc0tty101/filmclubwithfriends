@@ -1,0 +1,20 @@
+/* Page-specific styles for results page */
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-6);
+}
+.results-table th, .results-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--gray-200);
+  text-align: left;
+}
+.results-table th {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  font-weight: 600;
+}
+.results-table tr:last-child td {
+  border-bottom: none;
+}

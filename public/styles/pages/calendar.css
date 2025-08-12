@@ -1,0 +1,22 @@
+/* Page-specific styles for calendar and weeks */
+
+.week-card {
+  background: white;
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--gray-200);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.week-card:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.week-info h3 {
+  margin: 0 0 var(--space-2) 0;
+}
+.current-week {
+  border: 2px solid var(--primary);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}

@@ -83,9 +83,12 @@ router.get('/results/:date', (req, res) => {
                 <p>Week of ${new Date(weekDate).toLocaleDateString()}</p>
                 <p><strong>Genre: ${week.genre_name}</strong></p>
               </div>
-
+              <div class="stepper">
+                <div class="step completed"><div class="step-circle">1</div><span>Nomination</span></div>
+                <div class="step completed"><div class="step-circle">2</div><span>Voting</span></div>
+                <div class="step active"><div class="step-circle">3</div><span>Results</span></div>
+              </div>
               ${hasVotes ? `
-                <!-- Winner Display -->
                 <div class="card">
                   <div class="winner-display">
                     <h2>🎉 Winner!</h2>
@@ -94,8 +97,6 @@ router.get('/results/:date', (req, res) => {
                     <p><strong>${winner.total_points} points</strong> from ${winner.vote_count} votes</p>
                   </div>
                 </div>
-
-                <!-- All Results -->
                 <div class="card">
                   <h2>Final Rankings</h2>
                   ${nominations.map((nom, index) => `
