@@ -26,9 +26,6 @@ router.get('/manage-members', (req, res) => {
           <div class="header">
             <h1>👥 Manage Members</h1>
             <p>Add or remove film club members</p>
-            <div class="actions center" style="margin-top: 1.5rem;">
-              <a href="#add-member-form" class="btn btn-primary">Add Member</a>
-            </div>
           </div>
           ${message ? `<div class="alert alert-success">${message}</div>` : ''}
           ${error ? `<div class="alert alert-error">${error}</div>` : ''}
@@ -62,6 +59,10 @@ router.get('/manage-members', (req, res) => {
                 `).join('')}
               </div>`
             }
+          </div>
+
+          <div class="actions center" style="margin-top: 1.5rem;">
+            <a href="#add-member-form" class="btn btn-primary">Add Member</a>
           </div>
 
           <div class="card" id="add-member-form">
