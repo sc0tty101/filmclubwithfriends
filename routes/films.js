@@ -1,4 +1,4 @@
-// routes/films.js - Updated with server-side TMDB API and admin controls
+// routes/films.js - Corrected version with fixed template literals
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
@@ -202,13 +202,10 @@ router.get('/nominate/:date', (req, res) => {
             </div>
 
             <script>
-              // Updated to use server-side API endpoints
-              
               async function searchFilms() {
                 const query = document.getElementById('filmSearch').value;
                 if (!query) return;
                 
-                // Show loading state
                 document.getElementById('searchResults').innerHTML = '<p>Searching...</p>';
                 
                 try {
@@ -223,14 +220,13 @@ router.get('/nominate/:date', (req, res) => {
                   
                   if (data.results && data.results.length > 0) {
                     results.innerHTML = '<div class="search-results">' +
-                      data.results.slice(0, 5).map(film => \`
-                        <div class="search-result-item" onclick="selectFilm(\${film.id})">
-                          <strong>\${film.title}</strong> 
-                          \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}
-                          <br>
-                          <small>\${film.overview ? film.overview.substring(0, 100) + '...' : ''}</small>
-                        </div>
-                      \`).join('') + '</div>';
+                      data.results.slice(0, 5).map(function(film) {
+                        return '<div class="search-result-item" onclick="selectFilm(' + film.id + ')">' +
+                          '<strong>' + film.title + '</strong> ' +
+                          (film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : '') +
+                          '<br><small>' + (film.overview ? film.overview.substring(0, 100) + '...' : '') + '</small>' +
+                          '</div>';
+                      }).join('') + '</div>';
                   } else {
                     results.innerHTML = '<p>No results found</p>';
                   }
@@ -253,24 +249,39 @@ router.get('/nominate/:date', (req, res) => {
                   document.getElementById('selectedFilm').style.display = 'block';
                   document.getElementById('searchResults').innerHTML = '';
                   
-                  const director = film.credits?.crew?.find(c => c.job === 'Director');
+                  const director = film.credits && film.credits.crew ? film.credits.crew.find(function(c) { return c.job === 'Director'; }) : null;
                   
-                  document.getElementById('selectedDetails').innerHTML = \`
-                    <div class="film-card">
-                      \${film.poster_path ? 
-                        '<img src="https://image.tmdb.org/t/p/w92' + film.poster_path + '" class="film-poster">' :
-                        '<div class="poster-placeholder">No poster</div>'
-                      }
-                      <div>
-                        <strong>\${film.title}</strong> 
-                        \${film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : ''}<br>
-                        \${director ? 'Director: ' + director.name + '<br>' : ''}
-                        \${film.runtime ? 'Runtime: ' + film.runtime + ' mins<br>' : ''}
-                        \${film.vote_average ? 'Rating: ' + film.vote_average + '/10' : ''}
-                      </div>
-                      <div style="clear: both;"></div>
-                    </div>
-                  \`;
+                  let detailsHTML = '<div class="film-card">';
+                  
+                  if (film.poster_path) {
+                    detailsHTML += '<img src="https://image.tmdb.org/t/p/w92' + film.poster_path + '" class="film-poster">';
+                  } else {
+                    detailsHTML += '<div class="poster-placeholder">No poster</div>';
+                  }
+                  
+                  detailsHTML += '<div><strong>' + film.title + '</strong> ';
+                  
+                  if (film.release_date) {
+                    detailsHTML += '(' + film.release_date.substring(0, 4) + ')';
+                  }
+                  
+                  detailsHTML += '<br>';
+                  
+                  if (director) {
+                    detailsHTML += 'Director: ' + director.name + '<br>';
+                  }
+                  
+                  if (film.runtime) {
+                    detailsHTML += 'Runtime: ' + film.runtime + ' mins<br>';
+                  }
+                  
+                  if (film.vote_average) {
+                    detailsHTML += 'Rating: ' + film.vote_average + '/10';
+                  }
+                  
+                  detailsHTML += '</div><div style="clear: both;"></div></div>';
+                  
+                  document.getElementById('selectedDetails').innerHTML = detailsHTML;
                   
                   document.getElementById('tmdbId').value = film.id;
                   document.getElementById('title').value = film.title;
