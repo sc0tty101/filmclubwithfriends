@@ -1,12 +1,14 @@
-// routes/admin.js - Simplified to just database management
+// routes/admin.js - Updated with authentication and bug fixes
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
-const { createAllTables, dbPath } = require('../database/setup');
+const { createAllTables, dbPath, createNewConnection, enableForeignKeys } = require('../database/setup');
+const { requireAdmin } = require('../middleware/auth');
+const { dbRun } = require('../utils/dbHelpers');
 
 // Simple admin page with just database functions
-router.get('/admin', (req, res) => {
+router.get('/admin', requireAdmin, (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html>
@@ -57,96 +59,81 @@ router.get('/admin', (req, res) => {
 });
 
 // Clear all data (keeps schema)
-router.post('/admin/clear-data', (req, res) => {
+router.post('/admin/clear-data', requireAdmin, async (req, res) => {
   const clearQueries = [
     "DELETE FROM votes",
     "DELETE FROM results",
-    "DELETE FROM nominations", 
+    "DELETE FROM nominations",
     "DELETE FROM weeks",
     "DELETE FROM films",
     "DELETE FROM members",
     "DELETE FROM genres"
   ];
-  
-  let completed = 0;
-  
-  clearQueries.forEach(query => {
-    req.db.run(query, function(err) {
-      completed++;
-      
-      if (completed === clearQueries.length) {
-        if (err) {
-          res.send(`
-            <html><body>
-            <h1>Error clearing data</h1>
-            <p>${err.message}</p>
-            <a href="/admin">Back</a>
-            </body></html>
-          `);
-        } else {
-          res.send(`
-            <html><body>
-            <h1>✅ All data cleared!</h1>
-            <p>Database is empty but structure remains.</p>
-            <a href="/admin">Back to Admin</a> | 
-            <a href="/">Back to Calendar</a>
-            </body></html>
-          `);
-        }
-      }
-    });
-  });
+
+  try {
+    // Run all deletes in sequence to avoid race conditions
+    for (const query of clearQueries) {
+      await dbRun(req.db, query);
+    }
+
+    res.send(`
+      <html><body>
+      <link rel="stylesheet" href="/styles/main.css">
+      <div class="container">
+        <div class="card">
+          <h1>✅ All data cleared!</h1>
+          <p>Database is empty but structure remains.</p>
+          <div class="actions center">
+            <a href="/admin" class="btn btn-primary">Back to Admin</a>
+            <a href="/" class="btn btn-secondary">Back to Calendar</a>
+          </div>
+        </div>
+      </div>
+      </body></html>
+    `);
+  } catch (err) {
+    console.error('Clear data error:', err);
+    res.send(`
+      <html><body>
+      <link rel="stylesheet" href="/styles/main.css">
+      <div class="container">
+        <div class="card">
+          <h1>❌ Error clearing data</h1>
+          <p>${err.message}</p>
+          <div class="actions center">
+            <a href="/admin" class="btn btn-primary">Back to Admin</a>
+          </div>
+        </div>
+      </div>
+      </body></html>
+    `);
+  }
 });
 
-// Reset database completely
-router.post('/admin/reset-database', (req, res) => {
-  // Close current connection
-  req.db.close((closeErr) => {
-    if (closeErr) {
-      console.error('Error closing database:', closeErr);
-    }
-    
-    // Delete database file
-    try {
-      if (fs.existsSync(dbPath)) {
-        fs.unlinkSync(dbPath);
-      }
-      
-      // Create new database
-      const newDb = new sqlite3.Database(dbPath);
-      
-      createAllTables(newDb, (err) => {
-        newDb.close();
-        
-        if (err) {
-          res.send(`
-            <html><body>
-            <h1>Error resetting database</h1>
-            <p>${err.message}</p>
-            <a href="/admin">Back</a>
-            </body></html>
-          `);
-        } else {
-          res.send(`
-            <html><body>
-            <h1>✅ Database reset complete!</h1>
-            <p>Fresh database created. Application restart may be required.</p>
-            <a href="/admin">Back to Admin</a> | 
-            <a href="/">Back to Calendar</a>
-            </body></html>
-          `);
-        }
-      });
-    } catch (err) {
-      res.send(`
-        <html><body>
-        <h1>Error resetting database</h1>
-        <p>${err.message}</p>
-        <a href="/admin">Back</a>
-        </body></html>
-      `);
-    }
-  });
+// Reset database completely - WARNING: This requires app restart
+router.post('/admin/reset-database', requireAdmin, (req, res) => {
+  res.send(`
+    <html><body>
+    <link rel="stylesheet" href="/styles/main.css">
+    <div class="container">
+      <div class="card">
+        <h1>⚠️ Database Reset Requires Restart</h1>
+        <p><strong>Important:</strong> Resetting the database requires restarting the application.</p>
+        <p>Instead of resetting, please use the "Clear All Data" option which removes all data but keeps the structure.</p>
+        <p>If you really need to reset the database file:</p>
+        <ol>
+          <li>Stop the application</li>
+          <li>Delete the database file at: <code>${dbPath}</code></li>
+          <li>Restart the application (it will create a fresh database)</li>
+        </ol>
+        <div class="actions center">
+          <a href="/admin/clear-data" class="btn btn-warning" onclick="return confirm('Clear all data?');">Clear All Data Instead</a>
+          <a href="/admin" class="btn btn-secondary">Back to Admin</a>
+        </div>
+      </div>
+    </div>
+    </body></html>
+  `);
 });
 
 module.exports = router;

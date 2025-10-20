@@ -1,12 +1,13 @@
-// routes/weeks.js - Simplified week genre setting
+// routes/weeks.js - Updated with authentication
 const express = require('express');
 const router = express.Router();
 const { getGenres } = require('../database/setup');
+const { requireAuth } = require('../middleware/auth');
+const { validateDate } = require('../middleware/validation');
 
 // Set genre page
-router.get('/set-genre/:date', (req, res) => {
+router.get('/set-genre/:date', requireAuth, validateDate, (req, res) => {
   const weekDate = req.params.date;
-  const currentUser = req.query.user || '';
   
   getGenres((err, genres) => {
     if (err) {
@@ -90,7 +91,7 @@ router.get('/set-genre/:date', (req, res) => {
 });
 
 // Handle genre setting
-router.post('/set-genre/:date', (req, res) => {
+router.post('/set-genre/:date', requireAuth, validateDate, (req, res) => {
   const weekDate = req.params.date;
   const genreId = req.body.genre;
   const customGenre = req.body.customGenre?.trim();

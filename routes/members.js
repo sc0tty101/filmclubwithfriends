@@ -1,9 +1,11 @@
-// routes/members.js - Simplified member management
+// routes/members.js - Updated with authentication
 const express = require('express');
 const router = express.Router();
+const { requireAdmin } = require('../middleware/auth');
+const { validateMemberName } = require('../middleware/validation');
 
 // Member management page
-router.get('/manage-members', (req, res) => {
+router.get('/manage-members', requireAdmin, (req, res) => {
   req.db.all("SELECT * FROM members WHERE is_active = 1 ORDER BY name", (err, members) => {
     if (err) {
       console.error(err);
@@ -91,7 +93,7 @@ router.get('/manage-members', (req, res) => {
 });
 
 // Add member
-router.post('/add-member', (req, res) => {
+router.post('/add-member', requireAdmin, validateMemberName, (req, res) => {
   const memberName = req.body.memberName?.trim();
   const isAdmin = req.body.isAdmin ? 1 : 0;
   
@@ -115,7 +117,7 @@ router.post('/add-member', (req, res) => {
 });
 
 // Remove member
-router.post('/remove-member', (req, res) => {
+router.post('/remove-member', requireAdmin, (req, res) => {
   const memberId = req.body.memberId;
   
   req.db.run(
@@ -131,7 +133,7 @@ router.post('/remove-member', (req, res) => {
 });
 
 // Toggle admin status
-router.post('/toggle-admin', (req, res) => {
+router.post('/toggle-admin', requireAdmin, (req, res) => {
   const memberId = req.body.memberId;
   const currentAdmin = parseInt(req.body.currentAdmin);
   const newStatus = currentAdmin ? 0 : 1;

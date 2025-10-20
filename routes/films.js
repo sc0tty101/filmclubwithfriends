@@ -1,17 +1,21 @@
-// routes/films.js - Corrected version with fixed template literals
+// routes/films.js - Updated with auth, validation, and rate limiting
 const express = require('express');
 const axios = require('axios');
 const router = express.Router();
 const { getOrCreateFilm } = require('../database/setup');
+const { dbGet, dbAll, dbRun } = require('../utils/dbHelpers');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { validateDate } = require('../middleware/validation');
+const rateLimit = require('../middleware/rateLimit');
+const { TMDB_BASE_URL, MAX_SEARCH_RESULTS, MIN_NOMINATIONS_FOR_VOTING, TMDB_IMAGE_BASE, TMDB_POSTER_SIZE } = require('../config/constants');
 
 // TMDB API configuration
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
 // API ROUTES - Server-side TMDB proxy endpoints
 
-// Search films endpoint
-router.get('/api/search-films', async (req, res) => {
+// Search films endpoint (with rate limiting)
+router.get('/api/search-films', requireAuth, rateLimit, async (req, res) => {
   try {
     const { query } = req.query;
     
@@ -37,8 +41,8 @@ router.get('/api/search-films', async (req, res) => {
   }
 });
 
-// Get film details endpoint
-router.get('/api/film/:id', async (req, res) => {
+// Get film details endpoint (with rate limiting)
+router.get('/api/film/:id', requireAuth, rateLimit, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -63,9 +67,9 @@ router.get('/api/film/:id', async (req, res) => {
 // PAGE ROUTES - Nomination page and phase transitions
 
 // Nomination page
-router.get('/nominate/:date', (req, res) => {
+router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
   const weekDate = req.params.date;
-  const currentUser = req.query.user || '';
+  const currentUser = req.user;
 
   // Get week and its nominations
   req.db.get(`
@@ -368,52 +372,21 @@ router.post('/nominate/:date', (req, res) => {
 });
 
 // Begin voting phase (admin only)
-router.post('/begin-voting/:date', (req, res) => {
+router.post('/begin-voting/:date', requireAdmin, validateDate, async (req, res) => {
   const weekDate = req.params.date;
-  const currentUser = req.query.user || req.body.user;
-  
-  // Check if user is admin
-  req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUser], (err, member) => {
-    if (err || !member || !member.is_admin) {
-      return res.status(403).send('Admin access required');
-    }
-    
-    // Update phase to voting
-    req.db.run(
-      "UPDATE weeks SET phase = 'voting' WHERE week_date = ?",
-      [weekDate],
-      (err) => {
-        if (err) {
-          return res.status(500).send('Failed to begin voting');
-        }
-        res.redirect('/');
-      }
-    );
-  });
-});
 
-// Move to voting phase (admin only) - LEGACY route for existing buttons
-router.post('/move-to-voting/:date', (req, res) => {
-  const weekDate = req.params.date;
-  const currentUser = req.query.user || req.body.user;
-  
-  // Check if user is admin
-  req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUser], (err, member) => {
-    if (err || !member || !member.is_admin) {
-      return res.status(403).send('Admin access required');
-    }
-    
-    req.db.run(
+  try {
+    // Update phase to voting
+    await dbRun(
+      req.db,
       "UPDATE weeks SET phase = 'voting' WHERE week_date = ?",
-      [weekDate],
-      (err) => {
-        if (err) {
-          return res.status(500).send('Failed to update phase');
-        }
-        res.redirect('/');
-      }
+      [weekDate]
     );
-  });
+    res.redirect('/');
+  } catch (err) {
+    console.error('Begin voting error:', err);
+    res.status(500).send('Failed to begin voting');
+  }
 });
 
 module.exports = router;

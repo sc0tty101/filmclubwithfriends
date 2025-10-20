@@ -1,11 +1,13 @@
-// routes/votes.js - Updated voting interface with admin controls
+// routes/votes.js - Updated with authentication
 const express = require('express');
 const router = express.Router();
+const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { validateDate } = require('../middleware/validation');
 
 // Voting page
-router.get('/vote/:date', (req, res) => {
+router.get('/vote/:date', requireAuth, validateDate, (req, res) => {
   const weekDate = req.params.date;
-  const currentUser = req.query.user || '';
+  const currentUser = req.user;
 
   // Get week info
   req.db.get(`
@@ -33,11 +35,11 @@ router.get('/vote/:date', (req, res) => {
 
       // Check if user already voted
       req.db.get(
-        `SELECT id FROM votes 
-         WHERE week_id = ? 
-         AND member_id = (SELECT id FROM members WHERE name = ?)
+        `SELECT id FROM votes
+         WHERE week_id = ?
+         AND member_id = ?
          LIMIT 1`,
-        [week.id, currentUser],
+        [week.id, currentUser.id],
         (err, hasVoted) => {
           
           // Get all votes to show progress
@@ -50,9 +52,8 @@ router.get('/vote/:date', (req, res) => {
             (err, voters) => {
               if (err) voters = [];
 
-              // Check if current user is admin
-              req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUser], (err, member) => {
-                const isAdmin = member && member.is_admin;
+              // User is already authenticated with admin status in session
+              const isAdmin = currentUser.isAdmin;
 
                 res.send(`
                   <!DOCTYPE html>
@@ -269,7 +270,6 @@ router.get('/vote/:date', (req, res) => {
                   </body>
                   </html>
                 `);
-              });
             }
           );
         }
@@ -279,12 +279,13 @@ router.get('/vote/:date', (req, res) => {
 });
 
 // Handle vote submission
-router.post('/vote/:date', (req, res) => {
+router.post('/vote/:date', requireAuth, validateDate, (req, res) => {
   const weekDate = req.params.date;
-  const { user, rankings } = req.body;
+  const currentUser = req.user;
+  const { rankings } = req.body;
 
-  if (!user || !rankings) {
-    return res.status(400).send('User and rankings required');
+  if (!rankings) {
+    return res.status(400).send('Rankings required');
   }
 
   let parsedRankings;
@@ -294,56 +295,42 @@ router.post('/vote/:date', (req, res) => {
     return res.status(400).send('Invalid rankings data');
   }
 
-  // Get week and member
+  // Get week
   req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
     if (err || !week) {
       return res.status(404).send('Week not found');
     }
 
-    req.db.get("SELECT id FROM members WHERE name = ?", [user], (err, member) => {
-      if (err || !member) {
-        return res.status(404).send('Member not found');
+    // Submit votes using helper function
+    const dbHelpers = require('../database/setup');
+    dbHelpers.submitVotes(week.id, currentUser.id, parsedRankings, (err) => {
+      if (err) {
+        console.error('Vote submission error:', err);
+        return res.status(500).send('Failed to submit vote');
       }
-
-      // Submit votes using helper function
-      const dbHelpers = require('../database/setup');
-      dbHelpers.submitVotes(week.id, member.id, parsedRankings, (err) => {
-        if (err) {
-          console.error('Vote submission error:', err);
-          return res.status(500).send('Failed to submit vote');
-        }
-        res.redirect(`/vote/${weekDate}?user=${user}`);
-      });
+      res.redirect(`/vote/${weekDate}`);
     });
   });
 });
 
 // Calculate results route (admin only)
-router.post('/calculate-results/:date', (req, res) => {
+router.post('/calculate-results/:date', requireAdmin, validateDate, (req, res) => {
   const weekDate = req.params.date;
-  const currentUser = req.query.user || req.body.user;
-  
-  // Check if user is admin
-  req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUser], (err, member) => {
-    if (err || !member || !member.is_admin) {
-      return res.status(403).send('Admin access required');
-    }
-    
-    // Get week
-    req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
-      if (err || !week) {
-        return res.status(404).send('Week not found');
-      }
 
-      // Calculate results using helper function
-      const dbHelpers = require('../database/setup');
-      dbHelpers.calculateResults(week.id, (err, winner) => {
-        if (err) {
-          console.error('Calculate results error:', err);
-          return res.status(500).send('Failed to calculate results');
-        }
-        res.redirect(`/results/${weekDate}`);
-      });
+  // Get week
+  req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
+    if (err || !week) {
+      return res.status(404).send('Week not found');
+    }
+
+    // Calculate results using helper function
+    const dbHelpers = require('../database/setup');
+    dbHelpers.calculateResults(week.id, (err, winner) => {
+      if (err) {
+        console.error('Calculate results error:', err);
+        return res.status(500).send('Failed to calculate results');
+      }
+      res.redirect(`/results/${weekDate}`);
     });
   });
 });
