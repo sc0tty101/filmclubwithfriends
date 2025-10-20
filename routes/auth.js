@@ -68,7 +68,10 @@ router.post('/login', async (req, res) => {
   const { userName } = req.body;
   const redirect = req.body.redirect || '/';
 
+  console.log('Login attempt for user:', userName);
+
   if (!userName) {
+    console.log('Login failed: No username provided');
     return res.redirect('/login?error=Please select your name');
   }
 
@@ -81,18 +84,31 @@ router.post('/login', async (req, res) => {
     );
 
     if (!member) {
+      console.log('Login failed: Member not found:', userName);
       return res.redirect('/login?error=Member not found');
     }
+
+    console.log('Member found:', { id: member.id, name: member.name, isAdmin: member.is_admin });
 
     // Set session
     req.session.userId = member.id;
     req.session.userName = member.name;
     req.session.isAdmin = member.is_admin === 1;
 
-    res.redirect(redirect);
+    console.log('Session data set, saving...');
+
+    // Save session before redirect (important!)
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.redirect('/login?error=Session save failed');
+      }
+      console.log('Session saved successfully! Redirecting to:', redirect);
+      res.redirect(redirect);
+    });
   } catch (err) {
     console.error('Login error:', err);
-    res.redirect('/login?error=Login failed');
+    res.redirect('/login?error=Login failed: ' + err.message);
   }
 });
 
