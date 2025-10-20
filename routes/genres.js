@@ -1,10 +1,12 @@
-// routes/genres.js - Simplified genre management
+// routes/genres.js - Updated with authentication
 const express = require('express');
 const router = express.Router();
 const { getGenres } = require('../database/setup');
+const { requireAdmin } = require('../middleware/auth');
+const { validateGenreName } = require('../middleware/validation');
 
 // Genre management page
-router.get('/manage-genres', (req, res) => {
+router.get('/manage-genres', requireAdmin, (req, res) => {
   getGenres((err, genres) => {
     if (err) {
       console.error(err);
@@ -74,7 +76,7 @@ router.get('/manage-genres', (req, res) => {
 });
 
 // Add genre
-router.post('/add-genre', (req, res) => {
+router.post('/add-genre', requireAdmin, validateGenreName, (req, res) => {
   const genreName = req.body.genreName?.trim();
   
   if (!genreName) {
@@ -97,7 +99,7 @@ router.post('/add-genre', (req, res) => {
 });
 
 // Remove genre
-router.post('/remove-genre', (req, res) => {
+router.post('/remove-genre', requireAdmin, (req, res) => {
   const genreId = req.body.genreId;
   
   req.db.run(

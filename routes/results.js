@@ -1,9 +1,11 @@
-// routes/results.js - Final results display (complete phase only)
+// routes/results.js - Updated with authentication
 const express = require('express');
 const router = express.Router();
+const { requireAuth } = require('../middleware/auth');
+const { validateDate } = require('../middleware/validation');
 
 // View results page - only for completed weeks
-router.get('/results/:date', (req, res) => {
+router.get('/results/:date', requireAuth, validateDate, (req, res) => {
   const weekDate = req.params.date;
 
   // Get week info - ONLY for complete phase

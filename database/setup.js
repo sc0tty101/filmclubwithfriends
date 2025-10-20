@@ -10,10 +10,24 @@ const dbPath = process.env.DB_PATH || (
 );
 
 // Initialize SQLite database
-const db = new sqlite3.Database(dbPath);
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('❌ Database connection failed:', err);
+    process.exit(1);
+  }
+});
 
-// Enable foreign keys
-db.run("PRAGMA foreign_keys = ON");
+// Enable foreign keys - MUST be set for each connection
+db.run("PRAGMA foreign_keys = ON", (err) => {
+  if (err) {
+    console.error('❌ Failed to enable foreign keys:', err);
+  }
+});
+
+// Helper to ensure foreign keys are enabled for new connections
+function enableForeignKeys(database) {
+  database.run("PRAGMA foreign_keys = ON");
+}
 
 // Simplified schema - only essential tables
 const SCHEMA = {
@@ -283,11 +297,20 @@ createAllTables(db, (err) => {
   }
 });
 
+// Create a new database connection (used for admin operations)
+function createNewConnection(path) {
+  const newDb = new sqlite3.Database(path || dbPath);
+  enableForeignKeys(newDb);
+  return newDb;
+}
+
 // Export everything
 module.exports = {
   db,
   dbPath,
   SCHEMA,
   createAllTables,
+  enableForeignKeys,
+  createNewConnection,
   ...dbHelpers
 };
