@@ -160,7 +160,7 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                       <button type="button" onclick="searchFilms()" class="btn btn-primary">Search</button>
                     </div>
                   </form>
-                  
+
                   <div id="searchResults"></div>
                   
                   <div id="selectedFilm" style="display: none;">
@@ -206,22 +206,49 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
             </div>
 
             <script>
-              async function searchFilms() {
-                const query = document.getElementById('filmSearch').value;
-                if (!query) return;
-                
-                document.getElementById('searchResults').innerHTML = '<p>Searching...</p>';
-                
+              let searchTimeout;
+
+              const searchInput = document.getElementById('filmSearch');
+              if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                  clearTimeout(searchTimeout);
+
+                  const query = searchInput.value.trim();
+                  const results = document.getElementById('searchResults');
+                  results.innerHTML = query ? '<p>Searching...</p>' : '';
+
+                  searchTimeout = setTimeout(function() {
+                    if (query) {
+                      searchFilms(query);
+                    } else {
+                      results.innerHTML = '';
+                    }
+                  }, 300);
+                });
+              }
+
+              async function searchFilms(queryOverride) {
+                const query = typeof queryOverride === 'string'
+                  ? queryOverride
+                  : document.getElementById('filmSearch').value.trim();
+
+                const results = document.getElementById('searchResults');
+
+                if (!query) {
+                  results.innerHTML = '';
+                  return;
+                }
+
+                results.innerHTML = '<p>Searching...</p>';
+
                 try {
                   const response = await fetch('/api/search-films?query=' + encodeURIComponent(query));
                   const data = await response.json();
-                  
+
                   if (!response.ok) {
                     throw new Error(data.error || 'Search failed');
                   }
-                  
-                  const results = document.getElementById('searchResults');
-                  
+
                   if (data.results && data.results.length > 0) {
                     results.innerHTML = '<div class="search-results">' +
                       data.results.slice(0, 5).map(function(film) {
@@ -236,7 +263,7 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                   }
                 } catch (error) {
                   console.error('Search error:', error);
-                  document.getElementById('searchResults').innerHTML = 
+                  results.innerHTML =
                     '<p style="color: red;">Search failed: ' + error.message + '</p>';
                 }
               }
