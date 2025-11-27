@@ -142,7 +142,12 @@ router.get('/', requireAuth, (req, res) => {
               ` : ''}
               <div class="actions">
                 ${!currentWeek.id || currentWeek.phase === 'planning' ? `
-                  <a href="/set-genre/${currentWeek.date}" class="btn btn-primary">Set Genre</a>
+                  <a href="/set-genre/${currentWeek.date}" class="btn btn-primary">${currentWeek.genre_name ? 'Update Genre' : 'Set Genre'}</a>
+                  ${currentWeek.genre_name && currentUser.isAdmin ? `
+                    <form action="/open-nominations/${currentWeek.date}" method="POST" style="display: inline;">
+                      <button type="submit" class="btn btn-success">Open Nominations</button>
+                    </form>
+                  ` : ''}
                 ` : currentWeek.phase === 'nomination' ? `
                   <a href="/nominate/${currentWeek.date}" class="btn btn-success">Nominate Film</a>
                   ${currentWeek.nomination_count >= 3 && currentUser.isAdmin ? `
@@ -176,7 +181,12 @@ router.get('/', requireAuth, (req, res) => {
                 </div>
                 <div class="actions">
                   ${!week.id || week.phase === 'planning' ? `
-                    <a href="/set-genre/${week.date}" class="btn btn-primary btn-small">Set Genre</a>
+                    <a href="/set-genre/${week.date}" class="btn btn-primary btn-small">${week.genre_name ? 'Update Genre' : 'Set Genre'}</a>
+                    ${week.genre_name && currentUser.isAdmin ? `
+                      <form action="/open-nominations/${week.date}" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-success btn-small">Open Nominations</button>
+                      </form>
+                    ` : ''}
                   ` : week.phase === 'nomination' ? `
                     <a href="/nominate/${week.date}" class="btn btn-success btn-small">Nominate</a>
                     ${week.nomination_count >= 3 && currentUser.isAdmin ? `
