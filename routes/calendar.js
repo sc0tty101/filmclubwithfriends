@@ -326,4 +326,6 @@ router.get('/', requireAuth, (req, res) => {
   });
 });
 
+});
+
 module.exports = router;
