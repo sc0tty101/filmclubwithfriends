@@ -70,6 +70,7 @@ router.get('/api/film/:id', requireAuth, rateLimit, async (req, res) => {
 router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
   const weekDate = req.params.date;
   const currentUser = req.user;
+  const currentUserName = currentUser ? currentUser.name : null;
 
   // Get week and its nominations
   req.db.get(`
@@ -96,12 +97,14 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
         nominations = [];
       }
 
-      // Check if current user already nominated
-      const userNominated = nominations.some(n => n.nominator === currentUser);
+        // Check if current user already nominated
+        const userNominated = currentUserName
+          ? nominations.some(n => n.nominator === currentUserName)
+          : false;
 
-      // Check if current user is admin
-      req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUser], (err, member) => {
-        const isAdmin = member && member.is_admin;
+        // Check if current user is admin
+        req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUserName], (err, member) => {
+          const isAdmin = member && member.is_admin;
 
         res.send(`
           <!DOCTYPE html>
@@ -139,20 +142,20 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                   `).join('')
                 }
                 
-                ${nominations.length >= 3 && week.phase === 'nomination' && isAdmin ? `
-                  <div class="actions center">
-                    <form action="/begin-voting/${weekDate}" method="POST">
-                      <input type="hidden" name="user" value="${currentUser}">
-                      <button type="submit" class="btn btn-warning">Begin Voting</button>
-                    </form>
-                  </div>
-                ` : ''}
-              </div>
+                  ${nominations.length >= 3 && week.phase === 'nomination' && isAdmin ? `
+                    <div class="actions center">
+                      <form action="/begin-voting/${weekDate}" method="POST">
+                        <input type="hidden" name="user" value="${currentUserName}">
+                        <button type="submit" class="btn btn-warning">Begin Voting</button>
+                      </form>
+                    </div>
+                  ` : ''}
+                </div>
 
-              <!-- Nomination Form -->
-              ${currentUser && !userNominated && week.phase === 'nomination' ? `
-                <div class="card">
-                  <h2>Nominate Your Film</h2>
+                <!-- Nomination Form -->
+                ${currentUserName && !userNominated && week.phase === 'nomination' ? `
+                  <div class="card">
+                    <h2>Nominate Your Film</h2>
                   <form onsubmit="return false;">
                     <div class="form-group">
                       <label>Search for a film:</label>
@@ -163,12 +166,12 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
 
                   <div id="searchResults"></div>
                   
-                  <div id="selectedFilm" style="display: none;">
-                    <h3>Selected Film:</h3>
-                    <div id="selectedDetails"></div>
-                    <form action="/nominate/${weekDate}" method="POST" id="nominateForm">
-                      <input type="hidden" name="user" value="${currentUser}">
-                      <input type="hidden" name="tmdbId" id="tmdbId">
+                    <div id="selectedFilm" style="display: none;">
+                      <h3>Selected Film:</h3>
+                      <div id="selectedDetails"></div>
+                      <form action="/nominate/${weekDate}" method="POST" id="nominateForm">
+                        <input type="hidden" name="user" value="${currentUserName}">
+                        <input type="hidden" name="tmdbId" id="tmdbId">
                       <input type="hidden" name="title" id="title">
                       <input type="hidden" name="year" id="year">
                       <input type="hidden" name="posterUrl" id="posterUrl">
@@ -180,7 +183,7 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                     </form>
                   </div>
                 </div>
-              ` : !currentUser ? `
+              ` : !currentUserName ? `
                 <div class="card">
                   <p style="text-align: center; color: #999;">
                     Please select your name at the top of the page to nominate
@@ -354,13 +357,15 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
 });
 
 // Handle nomination
-router.post('/nominate/:date', (req, res) => {
-  const weekDate = req.params.date;
-  const { user, tmdbId, title, year, posterUrl, director, runtime, rating, overview } = req.body;
+  router.post('/nominate/:date', requireAuth, validateDate, (req, res) => {
+    const weekDate = req.params.date;
+    const { tmdbId, title, year, posterUrl, director, runtime, rating, overview } = req.body;
+    const memberId = req.user?.id;
+    const memberName = req.user?.name;
 
-  if (!user || !title) {
-    return res.status(400).send('User and film title required');
-  }
+    if (!memberId || !title) {
+      return res.status(400).send('User and film title required');
+    }
 
   // Get week, member, and create film
   req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
@@ -368,10 +373,10 @@ router.post('/nominate/:date', (req, res) => {
       return res.status(404).send('Week not found');
     }
 
-    req.db.get("SELECT id FROM members WHERE name = ?", [user], (err, member) => {
-      if (err || !member) {
-        return res.status(404).send('Member not found');
-      }
+      req.db.get("SELECT id, name FROM members WHERE id = ? AND is_active = 1", [memberId], (err, member) => {
+        if (err || !member) {
+          return res.status(404).send('Member not found');
+        }
 
       // Check if already nominated
       req.db.get(
@@ -398,17 +403,17 @@ router.post('/nominate/:date', (req, res) => {
             }
 
             // Create nomination
-            req.db.run(
-              "INSERT INTO nominations (week_id, film_id, member_id) VALUES (?, ?, ?)",
-              [week.id, filmId, member.id],
-              (err) => {
-                if (err) {
-                  return res.status(500).send('Failed to save nomination');
+              req.db.run(
+                "INSERT INTO nominations (week_id, film_id, member_id) VALUES (?, ?, ?)",
+                [week.id, filmId, member.id],
+                (err) => {
+                  if (err) {
+                    return res.status(500).send('Failed to save nomination');
+                  }
+                  res.redirect(`/nominate/${weekDate}?user=${encodeURIComponent(member.name || memberName)}`);
                 }
-                res.redirect(`/nominate/${weekDate}?user=${user}`);
-              }
-            );
-          });
+              );
+            });
         }
       );
     });
