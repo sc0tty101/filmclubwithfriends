@@ -271,10 +271,14 @@ const dbHelpers = {
 
       const winner = nominations[0];
 
-      // Store result
+      // Store result (idempotent for repeated calculations)
       db.run(
-        `INSERT OR REPLACE INTO results (week_id, winning_nomination_id, total_points)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO results (week_id, winning_nomination_id, total_points)
+         VALUES (?, ?, ?)
+         ON CONFLICT(week_id) DO UPDATE SET
+           winning_nomination_id = excluded.winning_nomination_id,
+           total_points = excluded.total_points,
+           calculated_at = CURRENT_TIMESTAMP`,
         [weekId, winner.nomination_id, winner.total_points],
         (err) => {
           if (!err) {
