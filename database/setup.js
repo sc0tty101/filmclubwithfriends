@@ -254,9 +254,9 @@ const dbHelpers = {
   // Calculate results
   calculateResults: function(weekId, callback) {
     db.get(`
-      SELECT 
+      SELECT
         n.id as nomination_id,
-        SUM(v.points) as total_points
+        COALESCE(SUM(v.points), 0) as total_points
       FROM nominations n
       LEFT JOIN votes v ON n.id = v.nomination_id
       WHERE n.week_id = ?
