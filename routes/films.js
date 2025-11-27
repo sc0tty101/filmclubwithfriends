@@ -253,13 +253,58 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                   }
 
                   if (data.results && data.results.length > 0) {
+                    const topResults = data.results.slice(0, 5);
+
+                    const enrichedResults = await Promise.all(topResults.map(async function(film) {
+                      try {
+                        const detailResponse = await fetch('/api/film/' + film.id);
+                        const detailData = await detailResponse.json();
+
+                        if (!detailResponse.ok) {
+                          throw new Error(detailData.error || 'Detail fetch failed');
+                        }
+
+                        return { search: film, details: detailData };
+                      } catch (err) {
+                        console.warn('Detail lookup failed for film', film.id, err);
+                        return { search: film, details: null };
+                      }
+                    }));
+
                     results.innerHTML = '<div class="search-results">' +
-                      data.results.slice(0, 5).map(function(film) {
-                        return '<div class="search-result-item" onclick="selectFilm(' + film.id + ')">' +
-                          '<strong>' + film.title + '</strong> ' +
-                          (film.release_date ? '(' + film.release_date.substring(0, 4) + ')' : '') +
-                          '<br><small>' + (film.overview ? film.overview.substring(0, 100) + '...' : '') + '</small>' +
-                          '</div>';
+                      enrichedResults.map(function(result) {
+                        const film = result.details || result.search;
+                        const releaseYear = (film.release_date && film.release_date.substring(0, 4)) || '';
+                        const releaseDate = film.release_date ? new Date(film.release_date).toLocaleDateString() : '';
+                        const runtime = film.runtime ? film.runtime + ' mins' : '';
+                        const genres = Array.isArray(film.genres)
+                          ? film.genres.map(function(g) { return g.name; }).filter(Boolean).join(', ')
+                          : '';
+                        const rating = film.vote_average ? film.vote_average.toFixed(1) : '';
+                        const overview = film.overview ? film.overview.substring(0, 220) + (film.overview.length > 220 ? '...' : '') : '';
+                        const posterPath = film.poster_path || (result.search && result.search.poster_path);
+
+                        return '<div class="search-result-item" onclick="selectFilm(' + result.search.id + ')">' +
+                          (posterPath
+                            ? '<img src="https://image.tmdb.org/t/p/w92' + posterPath + '" class="film-poster">'
+                            : '<div class="poster-placeholder">No poster</div>') +
+                          '<div class="search-result-body">' +
+                            '<div class="search-result-header">' +
+                              '<div>' +
+                                '<strong>' + film.title + '</strong> ' +
+                                (releaseYear ? '(' + releaseYear + ')' : '') +
+                              '</div>' +
+                              (rating ? '<span class="rating-badge">' + rating + '/10</span>' : '') +
+                            '</div>' +
+                            '<div class="film-meta">' +
+                              (releaseDate ? '<div><span class="meta-label">Release:</span> ' + releaseDate + '</div>' : '') +
+                              (runtime ? '<div><span class="meta-label">Runtime:</span> ' + runtime + '</div>' : '') +
+                              (genres ? '<div><span class="meta-label">Genres:</span> ' + genres + '</div>' : '') +
+                            '</div>' +
+                            (overview ? '<p class="film-overview search-overview">' + overview + '</p>' : '') +
+                          '</div>' +
+                          '<div style="clear: both;"></div>' +
+                        '</div>';
                       }).join('') + '</div>';
                   } else {
                     results.innerHTML = '<p>No results found</p>';
