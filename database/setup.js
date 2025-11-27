@@ -253,46 +253,55 @@ const dbHelpers = {
   
   // Calculate results
   calculateResults: function(weekId, callback) {
-    db.all(`
-      SELECT
-        n.id as nomination_id,
-        COALESCE(SUM(v.points), 0) as total_points
-      FROM nominations n
-      LEFT JOIN votes v ON n.id = v.nomination_id
-      WHERE n.week_id = ?
-      GROUP BY n.id
-      ORDER BY total_points DESC, n.id ASC
-    `, [weekId], (err, nominations) => {
-      if (err) return callback(err);
+    db.serialize(() => {
+      const rollback = (err) => {
+        db.run("ROLLBACK", () => callback(err));
+      };
 
-      if (!nominations || nominations.length === 0) {
-        return callback(new Error('No nominations found for this week'));
-      }
+      db.run("BEGIN TRANSACTION");
 
-      const winner = nominations[0];
+      db.get(`
+        SELECT
+          n.id as nomination_id,
+          COALESCE(SUM(v.points), 0) as total_points
+        FROM nominations n
+        LEFT JOIN votes v ON n.id = v.nomination_id AND v.week_id = n.week_id
+        WHERE n.week_id = ?
+        GROUP BY n.id
+        ORDER BY total_points DESC, n.id ASC
+        LIMIT 1
+      `, [weekId], (err, winner) => {
+        if (err) return rollback(err);
 
-      // Store result (idempotent for repeated calculations)
-      db.run(
-        `INSERT INTO results (week_id, winning_nomination_id, total_points)
-         VALUES (?, ?, ?)
-         ON CONFLICT(week_id) DO UPDATE SET
-           winning_nomination_id = excluded.winning_nomination_id,
-           total_points = excluded.total_points,
-           calculated_at = CURRENT_TIMESTAMP`,
-        [weekId, winner.nomination_id, winner.total_points],
-        (err) => {
-          if (!err) {
+        if (!winner) {
+          return rollback(new Error('No nominations found for this week'));
+        }
+
+        // Store result (idempotent for repeated calculations)
+        db.run(
+          `INSERT INTO results (week_id, winning_nomination_id, total_points)
+           VALUES (?, ?, ?)
+           ON CONFLICT(week_id) DO UPDATE SET
+             winning_nomination_id = excluded.winning_nomination_id,
+             total_points = excluded.total_points,
+             calculated_at = CURRENT_TIMESTAMP`,
+          [weekId, winner.nomination_id, winner.total_points],
+          (err) => {
+            if (err) return rollback(err);
+
             // Update week phase
             db.run(
               "UPDATE weeks SET phase = 'complete' WHERE id = ?",
               [weekId],
-              () => callback(err, winner)
+              (updateErr) => {
+                if (updateErr) return rollback(updateErr);
+
+                db.run("COMMIT", (commitErr) => callback(commitErr, winner));
+              }
             );
-          } else {
-            callback(err);
           }
-        }
-      );
+        );
+      });
     });
   }
 };
