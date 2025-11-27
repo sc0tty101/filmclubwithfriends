@@ -26,6 +26,7 @@ module.exports = {
   // Session configuration
   SESSION_SECRET: process.env.SESSION_SECRET || 'film-club-secret-change-in-production',
   SESSION_MAX_AGE: 7 * 24 * 60 * 60 * 1000, // 7 days
+  SESSION_SECURE_COOKIES: process.env.SESSION_SECURE_COOKIES === 'true',
 
   // Phases
   PHASES: {
