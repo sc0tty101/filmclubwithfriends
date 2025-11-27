@@ -326,7 +326,10 @@ const calculateResultsHandler = (req, res) => {
     dbHelpers.calculateResults(week.id, (err, winner) => {
       if (err) {
         console.error('Calculate results error:', err);
-        return res.status(500).send('Failed to calculate results');
+        const message = err.message === 'No nominations found for this week'
+          ? 'Cannot calculate results because this week has no nominations.'
+          : 'Failed to calculate results';
+        return res.status(400).send(message);
       }
       res.redirect(`/results/${weekDate}`);
     });

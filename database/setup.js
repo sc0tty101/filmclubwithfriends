@@ -253,19 +253,24 @@ const dbHelpers = {
   
   // Calculate results
   calculateResults: function(weekId, callback) {
-    db.get(`
-      SELECT 
+    db.all(`
+      SELECT
         n.id as nomination_id,
-        SUM(v.points) as total_points
+        COALESCE(SUM(v.points), 0) as total_points
       FROM nominations n
       LEFT JOIN votes v ON n.id = v.nomination_id
       WHERE n.week_id = ?
       GROUP BY n.id
-      ORDER BY total_points DESC
-      LIMIT 1
-    `, [weekId], (err, winner) => {
-      if (err || !winner) return callback(err || new Error('No votes found'));
-      
+      ORDER BY total_points DESC, n.id ASC
+    `, [weekId], (err, nominations) => {
+      if (err) return callback(err);
+
+      if (!nominations || nominations.length === 0) {
+        return callback(new Error('No nominations found for this week'));
+      }
+
+      const winner = nominations[0];
+
       // Store result
       db.run(
         `INSERT OR REPLACE INTO results (week_id, winning_nomination_id, total_points)
