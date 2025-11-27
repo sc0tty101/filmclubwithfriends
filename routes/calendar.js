@@ -160,9 +160,7 @@ router.get('/', requireAuth, (req, res) => {
                 ` : currentWeek.phase === 'voting' ? `
                   <a href="/vote/${currentWeek.date}" class="btn btn-warning">Vote Now</a>
                   ${currentUser.isAdmin ? `
-                    <form action="/calculate-results/${currentWeek.date}" method="POST" style="display: inline;">
-                      <button type="submit" class="btn btn-primary">Calculate Results</button>
-                    </form>
+                    <a href="/calculate-results/${currentWeek.date}" class="btn btn-primary">Calculate Results</a>
                   ` : ''}
                 ` : currentWeek.phase === 'complete' ? `
                   <a href="/results/${currentWeek.date}" class="btn btn-secondary">View Results</a>
@@ -203,9 +201,7 @@ router.get('/', requireAuth, (req, res) => {
                   ` : week.phase === 'voting' ? `
                     <a href="/vote/${week.date}" class="btn btn-warning btn-small">Vote</a>
                     ${currentUser.isAdmin ? `
-                      <form action="/calculate-results/${week.date}" method="POST" style="display: inline;">
-                        <button type="submit" class="btn btn-primary btn-small">Calculate Results</button>
-                      </form>
+                      <a href="/calculate-results/${week.date}" class="btn btn-primary btn-small">Calculate Results</a>
                     ` : ''}
                   ` : week.phase === 'complete' ? `
                     <a href="/results/${week.date}" class="btn btn-secondary btn-small">Results</a>
