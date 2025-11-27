@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { getGenres } = require('../database/setup');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { validateDate } = require('../middleware/validation');
 
 // Set genre page
@@ -113,7 +113,7 @@ router.post('/set-genre/:date', requireAuth, validateDate, (req, res) => {
       if (week) {
         // Update existing week
         req.db.run(
-          "UPDATE weeks SET genre_id = ?, phase = 'nomination' WHERE id = ?",
+          "UPDATE weeks SET genre_id = ? WHERE id = ?",
           [finalGenreId, week.id],
           (err) => {
             if (err) {
@@ -126,7 +126,7 @@ router.post('/set-genre/:date', requireAuth, validateDate, (req, res) => {
       } else {
         // Create new week
         req.db.run(
-          "INSERT INTO weeks (week_date, genre_id, phase) VALUES (?, ?, 'nomination')",
+          "INSERT INTO weeks (week_date, genre_id) VALUES (?, ?)",
           [weekDate, finalGenreId],
           (err) => {
             if (err) {
@@ -158,6 +158,46 @@ router.post('/set-genre/:date', requireAuth, validateDate, (req, res) => {
   } else {
     setWeekGenre(genreId);
   }
+});
+
+// Open nominations (admin only)
+router.post('/open-nominations/:date', requireAdmin, validateDate, (req, res) => {
+  const weekDate = req.params.date;
+
+  req.db.get(
+    "SELECT id, genre_id, phase FROM weeks WHERE week_date = ?",
+    [weekDate],
+    (err, week) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).send('Database error');
+      }
+
+      if (!week) {
+        return res.status(404).send('Week not found');
+      }
+
+      if (!week.genre_id) {
+        return res.status(400).send('Set a genre before opening nominations');
+      }
+
+      if (week.phase === 'nomination') {
+        return res.redirect('/');
+      }
+
+      req.db.run(
+        "UPDATE weeks SET phase = 'nomination' WHERE id = ?",
+        [week.id],
+        (updateErr) => {
+          if (updateErr) {
+            console.error(updateErr);
+            return res.status(500).send('Failed to open nominations');
+          }
+          res.redirect('/');
+        }
+      );
+    }
+  );
 });
 
 module.exports = router;
