@@ -306,6 +306,11 @@ a:hover {
   background: white;
 }
 
+.film-card-selected {
+  border-color: var(--primary);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
+}
+
 .film-poster {
   width: 60px;
   height: 90px;
@@ -328,6 +333,30 @@ a:hover {
   text-align: center;
   float: left;
   margin-right: var(--space-3);
+}
+
+.film-card-content {
+  overflow: hidden;
+}
+
+.film-meta {
+  margin-top: var(--space-2);
+  color: var(--gray-700);
+  font-size: 0.9rem;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.meta-label {
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-right: var(--space-2);
+}
+
+.film-overview {
+  margin-top: var(--space-3);
+  color: var(--gray-600);
+  font-size: 0.95rem;
 }
 
 /* Search results */
