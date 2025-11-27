@@ -22,7 +22,8 @@ router.get('/', requireAuth, (req, res) => {
       COUNT(DISTINCT n.id) as nomination_count,
       COUNT(DISTINCT v.id) as vote_count,
       wf.title as winner_title,
-      wf.year as winner_year
+      wf.year as winner_year,
+      COUNT(DISTINCT CASE WHEN n.member_id = ? THEN n.id END) as user_nomination_count
     FROM weeks w
     LEFT JOIN genres g ON w.genre_id = g.id
     LEFT JOIN nominations n ON w.id = n.week_id
@@ -32,7 +33,7 @@ router.get('/', requireAuth, (req, res) => {
     LEFT JOIN films wf ON wn.film_id = wf.id
     GROUP BY w.id
     ORDER BY w.week_date DESC
-  `, (err, weeks) => {
+  `, [currentUser.id], (err, weeks) => {
     if (err) {
       console.error('Weeks error:', err);
       weeks = [];
@@ -77,6 +78,7 @@ router.get('/', requireAuth, (req, res) => {
         isCurrent: i === 0,
         isPast: i < 0,
         isFuture: i > 0,
+        userHasNomination: existingWeek ? existingWeek.user_nomination_count > 0 : false,
         ...existingWeek
       });
     }
@@ -149,7 +151,9 @@ router.get('/', requireAuth, (req, res) => {
                     </form>
                   ` : ''}
                 ` : currentWeek.phase === 'nomination' ? `
-                  <a href="/nominate/${currentWeek.date}" class="btn btn-success">Nominate Film</a>
+                  <a href="/nominate/${currentWeek.date}" class="btn btn-success">
+                    ${currentWeek.userHasNomination ? 'Change Nomination' : 'Nominate Film'}
+                  </a>
                   ${currentWeek.nomination_count >= 3 && currentUser.isAdmin ? `
                     <a href="/begin-voting/${currentWeek.date}" class="btn btn-warning">Begin Voting</a>
                   ` : ''}
@@ -188,7 +192,9 @@ router.get('/', requireAuth, (req, res) => {
                       </form>
                     ` : ''}
                   ` : week.phase === 'nomination' ? `
-                    <a href="/nominate/${week.date}" class="btn btn-success btn-small">Nominate</a>
+                    <a href="/nominate/${week.date}" class="btn btn-success btn-small">
+                      ${week.userHasNomination ? 'Change Nomination' : 'Nominate'}
+                    </a>
                     ${week.nomination_count >= 3 && currentUser.isAdmin ? `
                       <a href="/begin-voting/${week.date}" class="btn btn-warning btn-small">Begin Voting</a>
                     ` : ''}

@@ -101,6 +101,9 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
         const userNominated = currentUserName
           ? nominations.some(n => n.nominator === currentUserName)
           : false;
+        const userNomination = userNominated
+          ? nominations.find(n => n.nominator === currentUserName)
+          : null;
 
         // Check if current user is admin
         req.db.get("SELECT is_admin FROM members WHERE name = ? AND is_active = 1", [currentUserName], (err, member) => {
@@ -153,9 +156,27 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                 </div>
 
                 <!-- Nomination Form -->
-                ${currentUserName && !userNominated && week.phase === 'nomination' ? `
+                ${currentUserName && week.phase === 'nomination' ? `
+                  ${userNomination ? `
+                    <div class="card">
+                      <h2>Your Current Nomination</h2>
+                      <p style="color: #555; margin-bottom: 10px;">Submitting a new film below will replace this pick.</p>
+                      <div class="film-card">
+                        ${userNomination.poster_url ?
+                          `<img src="https://image.tmdb.org/t/p/w92${userNomination.poster_url}" class="film-poster">` :
+                          '<div class="poster-placeholder">No poster</div>'
+                        }
+                        <div>
+                          <strong>${userNomination.title}</strong> ${userNomination.year ? `(${userNomination.year})` : ''}<br>
+                          <small>Submitted by you</small>
+                        </div>
+                        <div style="clear: both;"></div>
+                      </div>
+                    </div>
+                  ` : ''}
                   <div class="card">
-                    <h2>Nominate Your Film</h2>
+                    <h2>${userNomination ? 'Change Your Nomination' : 'Nominate Your Film'}</h2>
+                    ${userNomination ? '<p style="color: #555;">Update your nomination by searching for a different film.</p>' : ''}
                   <form onsubmit="return false;">
                     <div class="form-group">
                       <label>Search for a film:</label>
@@ -165,7 +186,7 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                   </form>
 
                   <div id="searchResults"></div>
-                  
+
                     <div id="selectedFilm" style="display: none;">
                       <h3>Selected Film:</h3>
                       <div id="selectedDetails"></div>
@@ -179,7 +200,7 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                       <input type="hidden" name="runtime" id="runtime">
                       <input type="hidden" name="rating" id="rating">
                       <input type="hidden" name="overview" id="overview">
-                      <button type="submit" class="btn btn-success">Confirm Nomination</button>
+                      <button type="submit" class="btn btn-success">${userNomination ? 'Update Nomination' : 'Confirm Nomination'}</button>
                     </form>
                   </div>
                 </div>
@@ -187,12 +208,6 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                 <div class="card">
                   <p style="text-align: center; color: #999;">
                     Please select your name at the top of the page to nominate
-                  </p>
-                </div>
-              ` : userNominated ? `
-                <div class="card">
-                  <p style="text-align: center; color: #999;">
-                    You have already nominated a film for this week
                   </p>
                 </div>
               ` : week.phase !== 'nomination' ? `
@@ -412,27 +427,27 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
       return res.status(400).send('User and film title required');
     }
 
-  // Get week, member, and create film
-  req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
+  // Get week, member, and create or update nomination
+  req.db.get("SELECT id, phase FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
     if (err || !week) {
       return res.status(404).send('Week not found');
     }
 
-      req.db.get("SELECT id, name FROM members WHERE id = ? AND is_active = 1", [memberId], (err, member) => {
-        if (err || !member) {
-          return res.status(404).send('Member not found');
-        }
+    if (week.phase !== 'nomination') {
+      return res.status(400).send('Nominations are closed for this week');
+    }
 
-      // Check if already nominated
+    req.db.get("SELECT id, name FROM members WHERE id = ? AND is_active = 1", [memberId], (err, member) => {
+      if (err || !member) {
+        return res.status(404).send('Member not found');
+      }
+
+      // Check for an existing nomination by this member
       req.db.get(
-        "SELECT id FROM nominations WHERE week_id = ? AND member_id = ?",
+        "SELECT id, film_id FROM nominations WHERE week_id = ? AND member_id = ?",
         [week.id, member.id],
         (err, existing) => {
-          if (existing) {
-            return res.status(400).send('You already nominated');
-          }
-
-          // Create film
+          // Create or locate film record
           getOrCreateFilm({
             tmdb_id: tmdbId || null,
             title,
@@ -447,18 +462,48 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
               return res.status(500).send('Failed to save film');
             }
 
-            // Create nomination
-              req.db.run(
-                "INSERT INTO nominations (week_id, film_id, member_id) VALUES (?, ?, ?)",
-                [week.id, filmId, member.id],
-                (err) => {
-                  if (err) {
-                    return res.status(500).send('Failed to save nomination');
+            const conflictSql = existing
+              ? "SELECT id FROM nominations WHERE week_id = ? AND film_id = ? AND id != ?"
+              : "SELECT id FROM nominations WHERE week_id = ? AND film_id = ?";
+            const conflictParams = existing
+              ? [week.id, filmId, existing.id]
+              : [week.id, filmId];
+
+            req.db.get(conflictSql, conflictParams, (err, conflict) => {
+              if (err) {
+                console.error('Conflict check failed', err);
+                return res.status(500).send('Failed to save nomination');
+              }
+
+              if (conflict) {
+                return res.status(400).send('That film is already nominated for this week');
+              }
+
+              if (existing) {
+                req.db.run(
+                  "UPDATE nominations SET film_id = ?, nominated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                  [filmId, existing.id],
+                  (err) => {
+                    if (err) {
+                      return res.status(500).send('Failed to update nomination');
+                    }
+                    res.redirect(`/nominate/${weekDate}?user=${encodeURIComponent(member.name || memberName)}`);
                   }
-                  res.redirect(`/nominate/${weekDate}?user=${encodeURIComponent(member.name || memberName)}`);
-                }
-              );
+                );
+              } else {
+                req.db.run(
+                  "INSERT INTO nominations (week_id, film_id, member_id) VALUES (?, ?, ?)",
+                  [week.id, filmId, member.id],
+                  (err) => {
+                    if (err) {
+                      return res.status(500).send('Failed to save nomination');
+                    }
+                    res.redirect(`/nominate/${weekDate}?user=${encodeURIComponent(member.name || memberName)}`);
+                  }
+                );
+              }
             });
+          });
         }
       );
     });
