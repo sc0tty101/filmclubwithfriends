@@ -281,35 +281,52 @@ router.get('/nominate/:date', requireAuth, validateDate, async (req, res) => {
                   document.getElementById('searchResults').innerHTML = '';
                   
                   const director = film.credits && film.credits.crew ? film.credits.crew.find(function(c) { return c.job === 'Director'; }) : null;
-                  
-                  let detailsHTML = '<div class="film-card">';
-                  
+                  const genres = Array.isArray(film.genres) ? film.genres.map(function(g) { return g.name; }).filter(Boolean).join(', ') : '';
+                  const releaseDate = film.release_date ? new Date(film.release_date).toLocaleDateString() : '';
+
+                  let detailsHTML = '<div class="film-card film-card-selected">';
+
                   if (film.poster_path) {
                     detailsHTML += '<img src="https://image.tmdb.org/t/p/w92' + film.poster_path + '" class="film-poster">';
                   } else {
                     detailsHTML += '<div class="poster-placeholder">No poster</div>';
                   }
-                  
-                  detailsHTML += '<div><strong>' + film.title + '</strong> ';
-                  
+
+                  detailsHTML += '<div class="film-card-content">';
+                  detailsHTML += '<strong>' + film.title + '</strong> ';
+
                   if (film.release_date) {
                     detailsHTML += '(' + film.release_date.substring(0, 4) + ')';
                   }
-                  
-                  detailsHTML += '<br>';
-                  
+
+                  detailsHTML += '<div class="film-meta">';
+
+                  if (releaseDate) {
+                    detailsHTML += '<div><span class="meta-label">Release:</span> ' + releaseDate + '</div>';
+                  }
+
                   if (director) {
-                    detailsHTML += 'Director: ' + director.name + '<br>';
+                    detailsHTML += '<div><span class="meta-label">Director:</span> ' + director.name + '</div>';
                   }
-                  
+
                   if (film.runtime) {
-                    detailsHTML += 'Runtime: ' + film.runtime + ' mins<br>';
+                    detailsHTML += '<div><span class="meta-label">Runtime:</span> ' + film.runtime + ' mins</div>';
                   }
-                  
+
+                  if (genres) {
+                    detailsHTML += '<div><span class="meta-label">Genres:</span> ' + genres + '</div>';
+                  }
+
                   if (film.vote_average) {
-                    detailsHTML += 'Rating: ' + film.vote_average + '/10';
+                    detailsHTML += '<div><span class="meta-label">Rating:</span> ' + film.vote_average + '/10</div>';
                   }
-                  
+
+                  detailsHTML += '</div>';
+
+                  if (film.overview) {
+                    detailsHTML += '<p class="film-overview">' + film.overview + '</p>';
+                  }
+
                   detailsHTML += '</div><div style="clear: both;"></div></div>';
                   
                   document.getElementById('selectedDetails').innerHTML = detailsHTML;
