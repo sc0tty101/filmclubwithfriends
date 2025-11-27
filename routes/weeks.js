@@ -8,7 +8,8 @@ const { validateDate } = require('../middleware/validation');
 // Set genre page
 router.get('/set-genre/:date', requireAuth, validateDate, (req, res) => {
   const weekDate = req.params.date;
-  
+  const currentUser = req.session?.userName || '';
+
   getGenres((err, genres) => {
     if (err) {
       console.error(err);

@@ -9,7 +9,7 @@ const port = process.env.PORT || 3000;
 const dbModule = require('./database/setup');
 
 // Import configuration
-const { SESSION_SECRET, SESSION_MAX_AGE } = require('./config/constants');
+const { SESSION_SECRET, SESSION_MAX_AGE, SESSION_SECURE_COOKIES } = require('./config/constants');
 
 // Import middleware
 const { attachUser } = require('./middleware/auth');
@@ -25,6 +25,11 @@ if (SESSION_SECRET === 'film-club-secret-change-in-production' && process.env.NO
   console.warn('   Set SESSION_SECRET environment variable for better security.');
 }
 
+// Trust proxy if we're using secure cookies (needed for platforms like Render/Heroku)
+if (SESSION_SECURE_COOKIES) {
+  app.set('trust proxy', 1);
+}
+
 // Middleware
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -38,7 +43,7 @@ app.use(session({
   cookie: {
     maxAge: SESSION_MAX_AGE,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    secure: SESSION_SECURE_COOKIES,
     sameSite: 'lax'
   }
 }));
