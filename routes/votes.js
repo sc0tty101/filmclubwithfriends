@@ -314,16 +314,14 @@ router.post('/vote/:date', requireAuth, validateDate, (req, res) => {
 });
 
 // Calculate results route (admin only)
-router.post('/calculate-results/:date', requireAdmin, validateDate, (req, res) => {
+const calculateResultsHandler = (req, res) => {
   const weekDate = req.params.date;
 
-  // Get week
   req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
     if (err || !week) {
       return res.status(404).send('Week not found');
     }
 
-    // Calculate results using helper function
     const dbHelpers = require('../database/setup');
     dbHelpers.calculateResults(week.id, (err, winner) => {
       if (err) {
@@ -333,6 +331,9 @@ router.post('/calculate-results/:date', requireAdmin, validateDate, (req, res) =
       res.redirect(`/results/${weekDate}`);
     });
   });
-});
+};
+
+router.post('/calculate-results/:date', requireAdmin, validateDate, calculateResultsHandler);
+router.get('/calculate-results/:date', requireAdmin, validateDate, calculateResultsHandler);
 
 module.exports = router;
