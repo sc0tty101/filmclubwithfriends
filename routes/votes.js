@@ -204,19 +204,44 @@ router.get('/vote/:date', requireAuth, validateDate, (req, res) => {
                       
                       if (list) {
                         const items = list.querySelectorAll('.ranking-item');
-                        
+
                         items.forEach(item => {
                           item.addEventListener('dragstart', function(e) {
                             draggedItem = this;
                             this.classList.add('dragging');
                           });
-                          
+
                           item.addEventListener('dragend', function(e) {
                             this.classList.remove('dragging');
                             draggedItem = null;
                             updateRankNumbers();
                           });
-                          
+
+                          // Touch support for iOS Safari
+                          item.addEventListener('touchstart', function(e) {
+                            draggedItem = this;
+                            this.classList.add('dragging');
+                          }, { passive: true });
+
+                          item.addEventListener('touchmove', function(e) {
+                            if (!draggedItem) return;
+                            const touch = e.touches[0];
+                            const afterElement = getDragAfterElement(list, touch.clientY);
+                            if (afterElement == null) {
+                              list.appendChild(draggedItem);
+                            } else {
+                              list.insertBefore(draggedItem, afterElement);
+                            }
+                            e.preventDefault();
+                          }, { passive: false });
+
+                          item.addEventListener('touchend', function() {
+                            if (!draggedItem) return;
+                            this.classList.remove('dragging');
+                            draggedItem = null;
+                            updateRankNumbers();
+                          });
+
                           item.addEventListener('dragover', function(e) {
                             e.preventDefault();
                             const afterElement = getDragAfterElement(list, e.clientY);
