@@ -20,7 +20,7 @@ router.get('/', requireAuth, (req, res) => {
       w.phase,
       g.name as genre_name,
       COUNT(DISTINCT n.id) as nomination_count,
-      COUNT(DISTINCT v.id) as vote_count,
+      COUNT(DISTINCT v.member_id) as vote_count,
       wf.title as winner_title,
       wf.year as winner_year,
       COUNT(DISTINCT CASE WHEN n.member_id = ? THEN n.id END) as user_nomination_count
