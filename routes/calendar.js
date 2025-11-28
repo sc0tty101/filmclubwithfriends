@@ -190,6 +190,7 @@ router.get('/', requireAuth, (req, res) => {
                   <a href="/nominate/${currentWeek.date}" class="btn btn-success">
                     ${currentWeek.userHasNomination ? 'Change Nomination' : 'Nominate Film'}
                   </a>
+                  <a href="/set-genre/${currentWeek.date}" class="btn btn-primary">Change Genre</a>
                   ${currentWeek.nomination_count >= 3 && currentUser.isAdmin ? `
                     <a href="/begin-voting/${currentWeek.date}" class="btn btn-warning">Begin Voting</a>
                   ` : ''}
@@ -255,6 +256,7 @@ router.get('/', requireAuth, (req, res) => {
                       <a href="/nominate/${week.date}" class="btn btn-success btn-small">
                         ${week.userHasNomination ? 'Change Nomination' : 'Nominate'}
                       </a>
+                      <a href="/set-genre/${week.date}" class="btn btn-primary btn-small">Change Genre</a>
                       ${week.nomination_count >= 3 && currentUser.isAdmin ? `
                         <a href="/begin-voting/${week.date}" class="btn btn-warning btn-small">Begin Voting</a>
                       ` : ''}
