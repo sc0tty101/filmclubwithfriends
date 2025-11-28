@@ -106,7 +106,7 @@ router.post('/set-genre/:date', requireAuth, validateDate, (req, res) => {
   // Function to create or update week
   function setWeekGenre(finalGenreId) {
     // Check if week exists and ensure phase allows updates
-    req.db.get("SELECT id, phase FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
+    req.db.get("SELECT id, phase, genre_id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
       if (err) {
         console.error(err);
         return res.status(500).send('Database error');
@@ -118,17 +118,37 @@ router.post('/set-genre/:date', requireAuth, validateDate, (req, res) => {
 
       if (week) {
         // Update existing week
-        req.db.run(
-          "UPDATE weeks SET genre_id = ? WHERE id = ?",
-          [finalGenreId, week.id],
-          (err) => {
-            if (err) {
-              console.error(err);
-              return res.status(500).send('Failed to update week');
+        const genreChanged = String(week.genre_id || '') !== String(finalGenreId);
+
+        const updateWeek = () => {
+          req.db.run(
+            "UPDATE weeks SET genre_id = ? WHERE id = ?",
+            [finalGenreId, week.id],
+            (err) => {
+              if (err) {
+                console.error(err);
+                return res.status(500).send('Failed to update week');
+              }
+              res.redirect('/');
             }
-            res.redirect('/');
-          }
-        );
+          );
+        };
+
+        if (genreChanged) {
+          req.db.run(
+            'DELETE FROM nominations WHERE week_id = ?',
+            [week.id],
+            (deleteErr) => {
+              if (deleteErr) {
+                console.error(deleteErr);
+                return res.status(500).send('Failed to clear nominations for updated genre');
+              }
+              updateWeek();
+            }
+          );
+        } else {
+          updateWeek();
+        }
       } else {
         // Create new week
         req.db.run(
