@@ -62,138 +62,145 @@ router.get('/vote/:date', requireAuth, validateDate, (req, res) => {
                     <title>Vote - Film Club</title>
                     <meta name="viewport" content="width=device-width, initial-scale=1">
                     <link rel="stylesheet" href="/styles/main.css">
-                    <style>
-                      .ranking-list {
-                        list-style: none;
-                        padding: 0;
-                      }
-                      .ranking-item {
-                        background: white;
-                        border: 1px solid #ddd;
-                        border-radius: 8px;
-                        padding: 15px;
-                        margin-bottom: 10px;
-                        cursor: move;
-                        display: flex;
-                        align-items: center;
-                        gap: 15px;
-                      }
-                      .ranking-item.dragging {
-                        opacity: 0.5;
-                      }
-                      .rank-number {
-                        background: #2563eb;
-                        color: white;
-                        width: 30px;
-                        height: 30px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        flex-shrink: 0;
-                      }
-                      .vote-status {
-                        background: #f0f0f0;
-                        padding: 10px;
-                        border-radius: 8px;
-                        margin-bottom: 20px;
-                      }
-                    </style>
                   </head>
-                  <body>
+                  <body class="voting-page">
+                    <div class="voting-hero">
+                      <div class="container">
+                        <p class="eyebrow">Week of ${new Date(weekDate).toLocaleDateString()}</p>
+                        <h1>🗳️ Cast your rankings</h1>
+                        <p class="lead">Drag films into your preferred order. Your #1 pick receives the most points.</p>
+                        <div class="hero-meta">
+                          <span class="badge">Genre · ${week.genre_name}</span>
+                          <span class="badge badge-muted">${nominations.length} nominated films</span>
+                          <span class="badge badge-success">${voters.length} members have voted</span>
+                        </div>
+                      </div>
+                    </div>
+
                     <div class="container">
-                      <div class="header">
-                        <h1>🗳️ Vote for Films</h1>
-                        <p>Week of ${new Date(weekDate).toLocaleDateString()}</p>
-                        <p><strong>Genre: ${week.genre_name}</strong></p>
-                      </div>
-
-                      <!-- Voting Status -->
-                      <div class="card">
-                        <div class="vote-status">
-                          <strong>Voting Progress:</strong> ${voters.length} members have voted
-                          ${voters.length > 0 ? `<br><small>${voters.map(v => v.name).join(', ')}</small>` : ''}
-                        </div>
-                        
-                        ${isAdmin ? `
-                          <div class="actions center" style="margin-top: 15px;">
-                            <form action="/calculate-results/${weekDate}" method="POST">
-                              <input type="hidden" name="user" value="${currentUser}">
-                              <button type="submit" class="btn btn-primary">Calculate Results</button>
-                            </form>
-                          </div>
-                        ` : ''}
-                      </div>
-
-                      ${currentUser && !hasVoted ? `
-                        <!-- Voting Form -->
-                        <div class="card">
-                          <h2>Rank the Films</h2>
-                          <p>Drag to reorder. Your top choice gets the most points!</p>
-                          
-                          <form action="/vote/${weekDate}" method="POST" id="voteForm">
-                            <input type="hidden" name="user" value="${currentUser}">
-                            
-                            <ul class="ranking-list" id="rankingList">
-                              ${nominations.map((nom, index) => `
-                                <li class="ranking-item" draggable="true" data-id="${nom.id}">
-                                  <span class="rank-number">${index + 1}</span>
-                                  ${nom.poster_url ? 
-                                    `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="film-poster">` :
-                                    '<div class="poster-placeholder">No poster</div>'
-                                  }
-                                  <div style="flex: 1;">
-                                    <strong>${nom.title}</strong> ${nom.year ? `(${nom.year})` : ''}<br>
-                                    <small>Nominated by ${nom.nominator}</small>
-                                    ${nom.overview ? `<br><small>${nom.overview.substring(0, 100)}...</small>` : ''}
-                                  </div>
-                                </li>
-                              `).join('')}
-                            </ul>
-                            
-                            <input type="hidden" name="rankings" id="rankings">
-                            
-                            <div class="actions">
-                              <button type="submit" class="btn btn-primary">Submit Vote</button>
-                              <a href="/" class="btn btn-secondary">Cancel</a>
-                            </div>
-                          </form>
-                        </div>
-                      ` : currentUser && hasVoted ? `
-                        <div class="card">
-                          <p style="text-align: center; color: #999;">
-                            ✅ You have already voted for this week
-                          </p>
-                        </div>
-                      ` : `
-                        <div class="card">
-                          <p style="text-align: center; color: #999;">
-                            Please select your name at the top of the page to vote
-                          </p>
-                        </div>
-                      `}
-
-                      <!-- Show all nominations for reference -->
-                      <div class="card">
-                        <h2>All Nominations</h2>
-                        ${nominations.map(nom => `
-                          <div class="film-card">
-                            ${nom.poster_url ? 
-                              `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="film-poster">` :
-                              '<div class="poster-placeholder">No poster</div>'
-                            }
+                      <div class="voting-layout">
+                        <section class="card voting-card">
+                          <div class="card-header">
                             <div>
-                              <strong>${nom.title}</strong> ${nom.year ? `(${nom.year})` : ''}<br>
-                              <small>Nominated by ${nom.nominator}</small>
+                              <p class="eyebrow">Participation</p>
+                              <h2>Club check-in</h2>
                             </div>
-                            <div style="clear: both;"></div>
+                            ${isAdmin ? `
+                              <form action="/calculate-results/${weekDate}" method="POST">
+                                <input type="hidden" name="user" value="${currentUser}">
+                                <button type="submit" class="btn btn-primary">Calculate results</button>
+                              </form>
+                            ` : ''}
                           </div>
-                        `).join('')}
-                      </div>
+                          <div class="status-grid">
+                            <div class="status-tile">
+                              <p class="status-label">Voters so far</p>
+                              <p class="status-value">${voters.length}</p>
+                              <p class="status-subtext">${voters.length > 0 ? voters.map(v => v.name).join(', ') : 'Be the first to vote!'}</p>
+                            </div>
+                            <div class="status-tile">
+                              <p class="status-label">Your status</p>
+                              <p class="status-value">${hasVoted ? 'Submitted' : 'Pending'}</p>
+                              <p class="status-subtext">${hasVoted ? 'Thanks for voting!' : 'Votes lock in when you submit below.'}</p>
+                            </div>
+                            <div class="status-tile">
+                              <p class="status-label">How it works</p>
+                              <ul class="mini-steps">
+                                <li>Drag films to reorder.</li>
+                                <li>Top spot earns the most points.</li>
+                                <li>You can only submit once.</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </section>
 
-                      <div class="actions center">
-                        <a href="/" class="btn btn-secondary">Back to Calendar</a>
+                        ${currentUser && !hasVoted ? `
+                          <section class="card voting-card">
+                            <div class="card-header">
+                              <div>
+                                <p class="eyebrow">Your ballot</p>
+                                <h2>Rank the nominees</h2>
+                                <p class="muted">Drag with the handle to reorder before submitting.</p>
+                              </div>
+                              <div class="pill">${nominations.length} picks</div>
+                            </div>
+
+                            <form action="/vote/${weekDate}" method="POST" id="voteForm">
+                              <input type="hidden" name="user" value="${currentUser}">
+
+                              <ul class="ranking-list" id="rankingList">
+                                ${nominations.map((nom, index) => `
+                                  <li class="ranking-item" draggable="true" data-id="${nom.id}">
+                                    <div class="rank-number">${index + 1}</div>
+                                    ${nom.poster_url ?
+                                      `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="film-poster">` :
+                                      '<div class="poster-placeholder">No poster</div>'
+                                    }
+                                    <div class="vote-card-body">
+                                      <div class="vote-card-title">${nom.title} ${nom.year ? `(${nom.year})` : ''}</div>
+                                      <p class="vote-card-meta">Nominated by ${nom.nominator}</p>
+                                      ${nom.overview ? `<p class="vote-card-overview">${nom.overview.substring(0, 120)}...</p>` : ''}
+                                    </div>
+                                    <div class="drag-handle" aria-label="Drag to reorder" title="Drag to reorder">↕</div>
+                                  </li>
+                                `).join('')}
+                              </ul>
+
+                              <input type="hidden" name="rankings" id="rankings">
+
+                              <div class="form-footer">
+                                <div>
+                                  <p class="muted">Need to bail? You can still view the calendar without submitting.</p>
+                                </div>
+                                <div class="actions">
+                                  <a href="/" class="btn btn-secondary">Back to calendar</a>
+                                  <button type="submit" class="btn btn-primary">Submit vote</button>
+                                </div>
+                              </div>
+                            </form>
+                          </section>
+                        ` : currentUser && hasVoted ? `
+                          <section class="card voting-card">
+                            <div class="card-header">
+                              <h2>Thanks! Your vote is in.</h2>
+                              <p class="muted">You can still review this week's nominations below.</p>
+                            </div>
+                          </section>
+                        ` : `
+                          <section class="card voting-card">
+                            <div class="card-header">
+                              <h2>Select yourself to vote</h2>
+                              <p class="muted">Use the member selector at the top of the site to unlock the ballot.</p>
+                            </div>
+                          </section>
+                        `}
+
+                        <section class="card voting-card">
+                          <div class="card-header">
+                            <div>
+                              <p class="eyebrow">Reference</p>
+                              <h2>All nominations</h2>
+                              <p class="muted">Preview posters and nominators at a glance.</p>
+                            </div>
+                          </div>
+                          <div class="nomination-grid">
+                            ${nominations.map(nom => `
+                              <div class="nomination-card">
+                                ${nom.poster_url ?
+                                  `<img src="https://image.tmdb.org/t/p/w92${nom.poster_url}" class="nomination-poster">` :
+                                  '<div class="poster-placeholder-small">No poster</div>'
+                                }
+                                <div class="nomination-body">
+                                  <div class="nomination-title">${nom.title} ${nom.year ? `(${nom.year})` : ''}</div>
+                                  <div class="nomination-meta">Nominated by ${nom.nominator}</div>
+                                </div>
+                              </div>
+                            `).join('')}
+                          </div>
+                          <div class="actions center">
+                            <a href="/" class="btn btn-secondary">Back to calendar</a>
+                          </div>
+                        </section>
                       </div>
                     </div>
 
