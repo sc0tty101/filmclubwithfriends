@@ -103,11 +103,15 @@ router.post('/set-genre/:date', requireAuth, validateDate, (req, res) => {
 
   // Function to create or update week
   function setWeekGenre(finalGenreId) {
-    // Check if week exists
-    req.db.get("SELECT id FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
+    // Check if week exists and ensure phase allows updates
+    req.db.get("SELECT id, phase FROM weeks WHERE week_date = ?", [weekDate], (err, week) => {
       if (err) {
         console.error(err);
         return res.status(500).send('Database error');
+      }
+
+      if (week && week.phase && !['planning', 'nomination'].includes(week.phase)) {
+        return res.status(400).send('Cannot change genre after voting has started.');
       }
 
       if (week) {
