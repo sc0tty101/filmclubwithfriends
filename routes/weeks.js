@@ -2,8 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const { getGenres } = require('../database/setup');
+const { dbGet, dbRun, dbTransaction } = require('../utils/dbHelpers');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { validateDate } = require('../middleware/validation');
+const { PHASES } = require('../config/constants');
 
 // Set genre page
 router.get('/set-genre/:date', requireAuth, validateDate, (req, res) => {
@@ -202,6 +204,44 @@ router.post('/open-nominations/:date', requireAdmin, validateDate, (req, res) =>
       );
     }
   );
+});
+
+// Reset a week's data (admin only) - clears nominations, votes, results, and genre
+router.post('/reset-week/:date', requireAdmin, validateDate, async (req, res) => {
+  const weekDate = req.params.date;
+
+  try {
+    let week = await dbGet(
+      req.db,
+      'SELECT id FROM weeks WHERE week_date = ?',
+      [weekDate]
+    );
+
+    // If the week doesn't exist yet, create a blank entry so we can reset it
+    if (!week) {
+      const insertResult = await dbRun(
+        req.db,
+        'INSERT INTO weeks (week_date, phase, genre_id) VALUES (?, ?, NULL)',
+        [weekDate, PHASES.PLANNING]
+      );
+      week = { id: insertResult.lastID };
+    }
+
+    await dbTransaction(req.db, [
+      { sql: 'DELETE FROM votes WHERE week_id = ?', params: [week.id] },
+      { sql: 'DELETE FROM results WHERE week_id = ?', params: [week.id] },
+      { sql: 'DELETE FROM nominations WHERE week_id = ?', params: [week.id] },
+      {
+        sql: 'UPDATE weeks SET genre_id = NULL, phase = ? WHERE id = ?',
+        params: [PHASES.PLANNING, week.id]
+      }
+    ]);
+
+    res.redirect('/');
+  } catch (err) {
+    console.error('Reset week error:', err);
+    res.status(500).send('Failed to reset week');
+  }
 });
 
 module.exports = router;

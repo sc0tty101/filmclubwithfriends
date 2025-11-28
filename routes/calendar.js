@@ -202,6 +202,11 @@ router.get('/', requireAuth, (req, res) => {
                 ` : currentWeek.phase === 'complete' ? `
                   <a href="/results/${currentWeek.date}" class="btn btn-secondary">View Results</a>
                 ` : ''}
+                ${currentUser.isAdmin ? `
+                  <form action="/reset-week/${currentWeek.date}" method="POST" style="display: inline;" onsubmit="return confirm('Reset this week? This will remove nominations, votes, and the selected genre.');">
+                    <button type="submit" class="btn btn-danger">Reset Week</button>
+                  </form>
+                ` : ''}
               </div>
               ${currentWeek.nominations && currentWeek.nominations.length ? `
                 <div class="nomination-list">
