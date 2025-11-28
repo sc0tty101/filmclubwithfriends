@@ -121,6 +121,7 @@ const SCHEMA = {
     week_id INTEGER UNIQUE NOT NULL,
     winning_nomination_id INTEGER NOT NULL,
     total_points INTEGER NOT NULL,
+    vote_count INTEGER NOT NULL DEFAULT 0,
     calculated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (week_id) REFERENCES weeks(id) ON DELETE CASCADE,
@@ -137,6 +138,21 @@ const INDEXES = [
   "CREATE INDEX IF NOT EXISTS idx_films_tmdb ON films(tmdb_id)",
   "CREATE INDEX IF NOT EXISTS idx_results_week ON results(week_id)"
 ];
+
+// Ensure the results table has the vote_count column (backfill for older databases)
+function ensureResultsVoteCountColumn(database, callback) {
+  database.all("PRAGMA table_info(results)", (err, columns) => {
+    if (err) return callback(err);
+
+    const hasVoteCount = columns.some(col => col.name === 'vote_count');
+    if (hasVoteCount) return callback();
+
+    database.run(
+      "ALTER TABLE results ADD COLUMN vote_count INTEGER NOT NULL DEFAULT 0",
+      callback
+    );
+  });
+}
 
 // Function to create all tables
 function createAllTables(database, callback) {
@@ -155,8 +171,12 @@ function createAllTables(database, callback) {
         if (err) console.error('Error creating index:', err);
       });
     });
-    
-    if (callback) callback(null);
+
+    // Apply lightweight migrations
+    ensureResultsVoteCountColumn(database, (err) => {
+      if (err) console.error('Error ensuring results.vote_count column:', err);
+      if (callback) callback(null);
+    });
   });
 }
 
@@ -256,7 +276,8 @@ const dbHelpers = {
     db.get(`
       SELECT
         n.id as nomination_id,
-        COALESCE(SUM(v.points), 0) as total_points
+        COALESCE(SUM(v.points), 0) as total_points,
+        COUNT(DISTINCT v.member_id) as vote_count
       FROM nominations n
       LEFT JOIN votes v ON n.id = v.nomination_id
       WHERE n.week_id = ?
@@ -268,9 +289,9 @@ const dbHelpers = {
       
       // Store result
       db.run(
-        `INSERT OR REPLACE INTO results (week_id, winning_nomination_id, total_points)
-         VALUES (?, ?, ?)`,
-        [weekId, winner.nomination_id, winner.total_points],
+        `INSERT OR REPLACE INTO results (week_id, winning_nomination_id, total_points, vote_count)
+         VALUES (?, ?, ?, ?)`,
+        [weekId, winner.nomination_id, winner.total_points, winner.vote_count],
         (err) => {
           if (!err) {
             // Update week phase
