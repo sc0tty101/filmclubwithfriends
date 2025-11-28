@@ -246,6 +246,200 @@ a:hover {
    5. PAGE SPECIFIC
    ========================================================================== */
 
+/* Voting page */
+.voting-page {
+  background: var(--gray-50);
+}
+
+.voting-hero {
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: white;
+  padding: var(--space-8) var(--space-4);
+  margin: calc(-1 * var(--space-4)) 0 var(--space-6) 0;
+}
+
+.voting-hero h1 {
+  color: white;
+  margin-bottom: var(--space-2);
+}
+
+.hero-meta {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.8rem;
+  color: var(--gray-200);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.lead {
+  margin: 0 0 var(--space-4) 0;
+  color: #e2e8f0;
+  font-size: 1.1rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 0.9rem;
+}
+
+.badge-success { background: #16a34a; border-color: #22c55e; }
+.badge-muted { background: rgba(255, 255, 255, 0.16); }
+
+.voting-layout {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.voting-card {
+  border: 1px solid var(--gray-200);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.muted {
+  color: var(--gray-600);
+  margin: 0;
+}
+
+.pill {
+  background: var(--gray-100);
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  color: var(--gray-700);
+  font-weight: 600;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.status-tile {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+}
+
+.status-label {
+  margin: 0 0 var(--space-1) 0;
+  color: var(--gray-600);
+  font-weight: 600;
+}
+
+.status-value {
+  margin: 0 0 var(--space-2) 0;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.status-subtext {
+  margin: 0;
+  color: var(--gray-600);
+}
+
+.mini-steps {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--gray-700);
+  line-height: 1.4;
+}
+
+.mini-steps li { margin-bottom: var(--space-2); }
+
+.ranking-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ranking-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  background: white;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: move;
+}
+
+.ranking-item.dragging { opacity: 0.6; }
+
+.rank-number {
+  background: var(--primary);
+  color: white;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.vote-card-body {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.vote-card-title {
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.vote-card-meta {
+  margin: 0;
+  color: var(--gray-600);
+}
+
+.vote-card-overview {
+  margin: 0;
+  color: var(--gray-600);
+  line-height: 1.4;
+}
+
+.drag-handle {
+  font-size: 1.2rem;
+  color: var(--gray-500);
+  padding: 0 var(--space-2);
+}
+
+.form-footer {
+  margin-top: var(--space-4);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
 /* Week cards */
 .week-card {
   background: white;
@@ -557,7 +751,26 @@ a:hover {
   body {
     padding: var(--space-3);
   }
-  
+
+  .voting-hero {
+    margin: 0 0 var(--space-4) 0;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ranking-item {
+    grid-template-columns: auto auto 1fr auto;
+  }
+
+  .drag-handle {
+    justify-self: flex-end;
+    align-self: flex-start;
+  }
+
   .user-select {
     position: static;
     margin-bottom: var(--space-4);
