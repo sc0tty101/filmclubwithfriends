@@ -2,7 +2,6 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
-const { WEEKS_PAST, WEEKS_FUTURE } = require('../config/constants');
 
 router.get('/', requireAuth, (req, res) => {
   const currentUser = req.user; // From session via middleware
@@ -11,6 +10,12 @@ router.get('/', requireAuth, (req, res) => {
   if (!currentUser) {
     return res.redirect('/login');
   }
+
+  const currentYear = new Date().getFullYear();
+  const requestedYear = parseInt(req.query.year, 10);
+  const selectedYear = Number.isNaN(requestedYear) ? currentYear : requestedYear;
+  const yearOptions = Array.from(new Set([currentYear - 1, currentYear, currentYear + 1, selectedYear]))
+    .sort((a, b) => a - b);
 
   // Get all weeks with their data
   req.db.all(`
@@ -31,9 +36,10 @@ router.get('/', requireAuth, (req, res) => {
     LEFT JOIN results r ON w.id = r.week_id
     LEFT JOIN nominations wn ON r.winning_nomination_id = wn.id
     LEFT JOIN films wf ON wn.film_id = wf.id
+    WHERE strftime('%Y', w.week_date) = ?
     GROUP BY w.id
     ORDER BY w.week_date DESC
-  `, [currentUser.id], (err, weeks) => {
+  `, [currentUser.id, String(selectedYear)], (err, weeks) => {
     if (err) {
       console.error('Weeks error:', err);
       weeks = [];
@@ -94,25 +100,34 @@ router.get('/', requireAuth, (req, res) => {
         });
       }
 
+      function getFirstMondayOfYear(year) {
+        const firstDay = new Date(year, 0, 1);
+        const day = firstDay.getDay();
+        const diff = day === 0 ? 1 : day === 1 ? 0 : 8 - day;
+        firstDay.setDate(firstDay.getDate() + diff);
+        return firstDay;
+      }
+
       // Generate week slots
-      const currentMonday = getMondayOfWeek(new Date());
+      const todayMonday = getMondayOfWeek(new Date());
       const weekSlots = [];
 
-      // Generate from WEEKS_PAST to WEEKS_FUTURE (from constants)
-      for (let i = -WEEKS_PAST; i < WEEKS_FUTURE; i++) {
-        const weekDate = new Date(currentMonday);
-        weekDate.setDate(currentMonday.getDate() + (i * 7));
+      const firstMonday = getFirstMondayOfYear(selectedYear);
+      for (let i = 0; i < 52; i++) {
+        const weekDate = new Date(firstMonday);
+        weekDate.setDate(firstMonday.getDate() + (i * 7));
         const weekDateStr = formatDate(weekDate);
 
         // Find existing week data
         const existingWeek = weeks.find(w => w.week_date === weekDateStr);
+        const comparisonMonday = formatDate(todayMonday);
 
         weekSlots.push({
           date: weekDateStr,
           displayDate: formatDisplayDate(weekDate),
-          isCurrent: i === 0,
-          isPast: i < 0,
-          isFuture: i > 0,
+          isCurrent: weekDateStr === comparisonMonday,
+          isPast: weekDate < todayMonday,
+          isFuture: weekDate > todayMonday,
           userHasNomination: existingWeek ? existingWeek.user_nomination_count > 0 : false,
           nominations: existingWeek && existingWeek.id ? (nominationsByWeek[existingWeek.id] || []) : [],
           ...existingWeek
@@ -147,6 +162,15 @@ router.get('/', requireAuth, (req, res) => {
             <h1>🎬 Film Club Calendar</h1>
             <p>Weekly film nominations and voting</p>
           </div>
+
+          <form method="GET" action="/calendar" class="card" style="margin-bottom: 20px;">
+            <label for="calendar-year" style="font-weight: 600; margin-right: 10px;">Select year</label>
+            <select id="calendar-year" name="year" onchange="this.form.submit()">
+              ${yearOptions.map(yearOption => `
+                <option value="${yearOption}" ${yearOption === selectedYear ? 'selected' : ''}>${yearOption}</option>
+              `).join('')}
+            </select>
+          </form>
 
           <!-- Navigation -->
           ${currentUser.isAdmin ? `
