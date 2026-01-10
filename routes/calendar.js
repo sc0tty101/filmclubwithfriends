@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 
-router.get('/', requireAuth, (req, res) => {
+router.get(['/', '/calendar'], requireAuth, (req, res) => {
   const currentUser = req.user; // From session via middleware
 
   // Redirect to login if not authenticated (safety check)
